@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-chi/chi/v5"
+	"kumacore/core/httpx"
 )
 
 // Module is an app-local feature package registered by generated bootstrap code.
@@ -34,7 +34,7 @@ type Registrar interface {
 }
 
 // RouteRegistrar follows the meryl.moe module Routes pattern.
-type RouteRegistrar = func(chi.Router)
+type RouteRegistrar = httpx.RouteRegistrar
 
 // MiddlewareRegistrar is a standard HTTP middleware contribution.
 type MiddlewareRegistrar = func(http.Handler) http.Handler

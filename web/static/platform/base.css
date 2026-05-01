@@ -1,0 +1,65 @@
+html {
+	font-size: clamp(12.5px, 0.3vw + 9.4px, 14px);
+}
+
+:root {
+	--color-bg: #000;
+	--color-surface-1: #0d0d0d;
+	--color-border-strong: #2a2a2a;
+	--color-text-primary: #b0a482;
+	--color-accent-interactive: #b8748a;
+	--color-accent-deep: #ad7084;
+}
+
+* {
+	margin: 0;
+	padding: 0;
+	box-sizing: border-box;
+}
+
+body {
+	background: var(--color-bg);
+	color: var(--color-text-primary);
+	font-family: monospace;
+}
+
+#content {
+	display: flex;
+	flex-direction: column;
+	min-height: 100vh;
+}
+
+:where(a, button, input, textarea, select, [role='button']):focus-visible {
+	outline: 1px solid var(--color-accent-deep);
+	outline-offset: 2px;
+}
+
+.navbar {
+	font-family: monospace;
+	font-size: 1rem;
+	padding: 6px 12px;
+	border-bottom: 1px solid var(--color-border-strong);
+	background: var(--color-surface-1);
+	display: flex;
+	gap: 0.8rem;
+}
+
+.navbar a {
+	color: var(--color-accent-interactive);
+	text-decoration: none;
+}
+
+.navbar a:hover {
+	text-decoration: underline;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+	*,
+	*::before,
+	*::after {
+		animation: none !important;
+		transition: none !important;
+		scroll-behavior: auto !important;
+	}
+}

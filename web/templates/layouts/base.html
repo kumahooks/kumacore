@@ -1,0 +1,28 @@
+{{define "base"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+	<title>{{if .Title}}{{.Title}}{{else}}{{.AppName}}{{end}}</title>
+	<link rel="icon" href="/static/assets/icons/favicon.ico">
+
+	<link rel="stylesheet" href="/static/platform/base.css">
+
+	<meta name="htmx-config" content='{"refreshOnHistoryMiss":true}'>
+
+	{{block "page-head" .}}{{end}}
+
+	<script src="/static/vendor/htmx.min.js"></script>
+	<script src="/static/platform/history.js"></script>
+</head>
+
+<body hx-boost="true" hx-target="#content">
+	<main id="content">
+		{{template "page-content" .}}
+	</main>
+</body>
+</html>
+{{end}}
+
