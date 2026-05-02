@@ -1,3 +1,4 @@
+// Package home is a simple home page example.
 package home
 
 import (

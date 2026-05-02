@@ -11,13 +11,19 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	// kumacore:begin jobs-imports
 	jobslogging "kumacore/app/jobs/logging"
+	// kumacore:end jobs-imports
+
+	// kumacore:begin modules-imports
 	authmiddleware "kumacore/app/middleware/auth"
 	authmodule "kumacore/app/modules/auth"
 	healthmodule "kumacore/app/modules/health"
 	"kumacore/app/modules/home"
 	authrepository "kumacore/app/repositories/auth"
 	authservice "kumacore/app/services/auth"
+	// kumacore:end modules-imports
+
 	"kumacore/core/app"
 	"kumacore/core/config"
 	"kumacore/core/db"
@@ -51,18 +57,17 @@ func main() {
 		log.Fatalf("[server:main] open database: %v", err)
 	}
 
-	// Services Initialization
+	// Modules Initialization
+	// kumacore:begin modules-setup
 	authRepository := authrepository.NewRepository(appDatabase)
 	authService, err := authservice.NewService(authRepository, configuration.Core.Session.TTL)
 	if err != nil {
 		log.Fatalf("[server:main] create auth service: %v", err)
 	}
 
-	// Handlers Initialization
 	homeHandler := home.NewHandler(renderer, configuration.App.Name)
 	authHandler := authmodule.NewHandler(renderer, authService, configuration.Core.App.Dev)
 
-	// Health endpoint uses the app migration source for readiness checks.
 	healthHandler := healthmodule.NewHandler(
 		appDatabase,
 		appDialect,
@@ -72,10 +77,18 @@ func main() {
 			Directory:  "app/migrations/sqlite/app",
 		},
 	)
+	// kumacore:end modules-setup
 
 	// Worker Initialization
 	var workerRuntime *worker.Runtime
 	if configuration.Core.Worker.Enabled {
+		if err = os.MkdirAll(
+			filepath.Join(configuration.App.RootDir, "app/migrations/sqlite/worker"),
+			0o755,
+		); err != nil {
+			log.Fatalf("[server:main] create worker migration directory: %v", err)
+		}
+
 		if err = os.MkdirAll(filepath.Dir(configuration.Core.Worker.DBPath), 0o755); err != nil {
 			log.Fatalf("[server:main] create worker database directory: %v", err)
 		}
@@ -106,14 +119,19 @@ func main() {
 		Database:      appDatabase,
 		Dialect:       appDialect,
 		Middleware: []func(next http.Handler) http.Handler{
+			// kumacore:begin modules-middleware
 			authmiddleware.LoadAuth(authService),
+			// kumacore:end modules-middleware
 		},
 		Routes: []func(router chi.Router){
+			// kumacore:begin modules-routes
 			home.Routes(homeHandler),
 			authmodule.Routes(authHandler),
 			healthmodule.Routes(healthHandler),
+			// kumacore:end modules-routes
 		},
 		Jobs: []worker.Job{
+			// kumacore:begin jobs-register
 			{
 				Name:     "logging:cleanup",
 				Interval: 24 * time.Hour,
@@ -121,6 +139,7 @@ func main() {
 					return jobslogging.Cleanup(ctx, configuration.Core.Logging.Dir)
 				},
 			},
+			// kumacore:end jobs-register
 		},
 		FileSystem: fileSystem,
 		Renderer:   renderer,

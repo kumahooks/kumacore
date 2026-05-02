@@ -1,3 +1,4 @@
+// Package auth implements a login page and auth service
 package auth
 
 import (

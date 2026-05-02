@@ -1,4 +1,4 @@
-// Package health is responsible fro returning the health of the app's services.
+// Package health is responsible for returning the health of the app's services.
 package health
 
 import (
@@ -121,4 +121,3 @@ func checkMigrations(
 
 	return "ok"
 }
-
