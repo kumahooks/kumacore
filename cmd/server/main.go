@@ -14,6 +14,7 @@ import (
 	jobslogging "kumacore/app/jobs/logging"
 	authmiddleware "kumacore/app/middleware/auth"
 	authmodule "kumacore/app/modules/auth"
+	healthmodule "kumacore/app/modules/health"
 	"kumacore/app/modules/home"
 	authrepository "kumacore/app/repositories/auth"
 	authservice "kumacore/app/services/auth"
@@ -61,6 +62,17 @@ func main() {
 	homeHandler := home.NewHandler(renderer, configuration.App.Name)
 	authHandler := authmodule.NewHandler(renderer, authService, configuration.Core.App.Dev)
 
+	// Health endpoint uses the app migration source for readiness checks.
+	healthHandler := healthmodule.NewHandler(
+		appDatabase,
+		appDialect,
+		migrate.Source{
+			Backend:    appDialect.Name(),
+			FileSystem: fileSystem,
+			Directory:  "app/migrations/sqlite/app",
+		},
+	)
+
 	// Worker Initialization
 	var workerRuntime *worker.Runtime
 	if configuration.Core.Worker.Enabled {
@@ -99,6 +111,7 @@ func main() {
 		Routes: []func(router chi.Router){
 			home.Routes(homeHandler),
 			authmodule.Routes(authHandler),
+			healthmodule.Routes(healthHandler),
 		},
 		Jobs: []worker.Job{
 			{
