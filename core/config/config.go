@@ -42,7 +42,7 @@ type CoreConfig struct {
 	}
 
 	Worker struct {
-		Enabled      bool          `envconfig:"CORE_WORKER_ENABLED"       default:"false"`
+		Enabled      bool          `envconfig:"CORE_WORKER_ENABLED"       default:"true"`
 		DBPath       string        `envconfig:"CORE_WORKER_DB_PATH"       default:"./data/db/kumacore_worker.db"`
 		PollInterval time.Duration `envconfig:"CORE_WORKER_POLL_INTERVAL" default:"5s"`
 		MaxAttempts  int           `envconfig:"CORE_WORKER_MAX_ATTEMPTS"  default:"3"`
