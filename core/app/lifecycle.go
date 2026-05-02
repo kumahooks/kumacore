@@ -38,7 +38,7 @@ func (application *App) Initialize(ctx context.Context) error {
 
 	resolvedModules := registry.Resolve()
 
-	if err := application.openDatabase(); err != nil {
+	if err = application.openDatabase(); err != nil {
 		application.close()
 		return err
 	}

@@ -1,0 +1,14 @@
+{{define "page-head"}}
+<link rel="stylesheet" href="/static/modules/auth/auth.css">
+{{end}}
+
+{{define "page-content"}}
+<title>{{.Title}}</title>
+<link rel="stylesheet" href="/static/modules/auth/auth.css">
+
+{{template "navbar" .}}
+
+<div class="auth-me-container">
+	<p class="auth-me-text">authenticated as <span class="auth-me-username">{{.User.Username}}</span></p>
+</div>
+{{end}}

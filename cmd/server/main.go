@@ -12,8 +12,8 @@ import (
 	"kumacore/core/module"
 	"kumacore/core/render"
 
-	// Modules
-	"kumacore/modules/home"
+	// App modules
+	"kumacore/app/modules/home"
 )
 
 func main() {

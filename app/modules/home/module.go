@@ -1,4 +1,4 @@
-// Package home implements the home page scaffold module.
+// Package home implements the home page app module.
 package home
 
 import (
@@ -13,7 +13,7 @@ type Module struct {
 	handler *Handler
 }
 
-// New returns the home scaffold module.
+// New returns the home app module.
 func New(renderer render.Renderer, applicationName string) *Module {
 	return &Module{
 		handler: NewHandler(renderer, applicationName),

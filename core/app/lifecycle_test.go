@@ -156,11 +156,11 @@ func TestInitialize_MigrationFailureClosesDatabase(t *testing.T) {
 		MigrationSource: migrate.Source{
 			Backend: "sqlite",
 			FileSystem: fstest.MapFS{
-				"migrations/sqlite/0002_create_widgets.sql": &fstest.MapFile{
+				"app/migrations/sqlite/0002_create_widgets.sql": &fstest.MapFile{
 					Data: []byte("CREATE TABLE widgets (id INTEGER PRIMARY KEY);"),
 				},
 			},
-			Directory: "migrations/sqlite",
+			Directory: "app/migrations/sqlite",
 		},
 	})
 	if err != nil {
@@ -212,13 +212,13 @@ func testConfiguration(t *testing.T) *config.Config {
 
 func testFileSystem() fstest.MapFS {
 	return fstest.MapFS{
-		"web/templates/layouts/base.html": &fstest.MapFile{
+		"app/web/templates/layouts/base.html": &fstest.MapFile{
 			Data: []byte(`{{define "base"}}{{template "page-content" .}}{{end}}`),
 		},
-		"web/templates/components/navbar.html": &fstest.MapFile{
+		"app/web/templates/components/navbar.html": &fstest.MapFile{
 			Data: []byte(`{{define "navbar"}}{{end}}`),
 		},
-		"migrations/sqlite/0001_create_widgets.sql": &fstest.MapFile{
+		"app/migrations/sqlite/0001_create_widgets.sql": &fstest.MapFile{
 			Data: []byte(`CREATE TABLE widgets (id INTEGER PRIMARY KEY);`),
 		},
 	}
@@ -228,6 +228,6 @@ func testMigrationSource(fileSystem fstest.MapFS) migrate.Source {
 	return migrate.Source{
 		Backend:    "sqlite",
 		FileSystem: fileSystem,
-		Directory:  "migrations/sqlite",
+		Directory:  "app/migrations/sqlite",
 	}
 }

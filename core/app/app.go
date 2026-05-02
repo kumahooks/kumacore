@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	staticDirectory           = "web/static"
-	defaultMigrationDirectory = "migrations/sqlite"
+	staticDirectory           = "app/web/static"
+	defaultMigrationDirectory = "app/migrations/sqlite"
 )
 
 type WorkerRuntime interface {

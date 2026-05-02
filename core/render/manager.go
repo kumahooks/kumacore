@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	layoutsPattern    = "web/templates/layouts/*.html"
-	componentsPattern = "web/templates/components/*.html"
+	layoutsPattern    = "app/web/templates/layouts/*.html"
+	componentsPattern = "app/web/templates/components/*.html"
 )
 
 // Renderer is the interface handlers use to execute page templates.

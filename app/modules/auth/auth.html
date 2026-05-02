@@ -1,0 +1,28 @@
+{{define "page-head"}}
+<link rel="stylesheet" href="/static/modules/auth/auth.css">
+{{end}}
+
+{{define "page-content"}}
+<title>{{.Title}}</title>
+<link rel="stylesheet" href="/static/modules/auth/auth.css">
+
+<div class="auth-container">
+	<div class="auth-card">
+		<div class="auth-header">
+			<p class="auth-title">auth<span class="auth-title-slash">/</span></p>
+			<a class="auth-back" href="/">$ cd ..</a>
+		</div>
+
+		<form class="auth-form" method="POST" action="/auth" hx-boost="false">
+			<input class="auth-input" type="text" name="username" placeholder="username" autocomplete="username" autofocus>
+			<input class="auth-input" type="password" name="password" placeholder="password" autocomplete="current-password">
+
+			{{if .Error}}
+			<p class="auth-error">{{.Error}}</p>
+			{{end}}
+
+			<button class="auth-submit" type="submit">enter</button>
+		</form>
+	</div>
+</div>
+{{end}}

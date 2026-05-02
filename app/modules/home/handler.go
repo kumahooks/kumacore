@@ -29,7 +29,7 @@ func Routes(handler *Handler) func(chi.Router) {
 
 // Index renders the home page.
 func (handler *Handler) Index(writer http.ResponseWriter, request *http.Request) {
-	pageFile := "modules/home/home.html"
+	pageFile := "app/modules/home/home.html"
 	data := map[string]any{
 		"Title":           handler.applicationName,
 		"ApplicationName": handler.applicationName,
