@@ -12,11 +12,10 @@ import (
 	"time"
 
 	"kumacore/core/httpx"
-	"kumacore/core/module"
 	"kumacore/core/render"
 )
 
-// Initialize builds the template manager and wires module middleware and routes.
+// Initialize builds the template manager, runs migrations, and wires middleware and routes.
 func (application *App) Initialize(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
@@ -30,35 +29,21 @@ func (application *App) Initialize(ctx context.Context) error {
 
 	log.Printf("[app:Initialize] logging initialized")
 
-	registry, err := module.NewRegistry(application.options.Modules...)
-	if err != nil {
-		application.close()
-		return err
-	}
-
-	resolvedModules := registry.Resolve()
-
-	if err = application.openDatabase(); err != nil {
-		application.close()
-		return err
-	}
-
-	contributions, err := module.CollectContributions(resolvedModules...)
-	if err != nil {
+	if err := application.runMigrations(ctx); err != nil {
 		application.close()
 		return err
 	}
 
 	if application.options.WorkerRuntime != nil {
-		if err := application.options.WorkerRuntime.Register(contributions.JobRegistrars()...); err != nil {
+		if err := application.options.WorkerRuntime.Initialize(ctx); err != nil {
+			application.close()
+			return fmt.Errorf("[app:Initialize] initialize worker: %w", err)
+		}
+
+		if err := application.options.WorkerRuntime.Register(application.options.Jobs...); err != nil {
 			application.close()
 			return fmt.Errorf("[app:Initialize] register worker jobs: %w", err)
 		}
-	}
-
-	if err := application.runMigrations(ctx); err != nil {
-		application.close()
-		return err
 	}
 
 	if application.options.Renderer != nil {
@@ -78,10 +63,10 @@ func (application *App) Initialize(ctx context.Context) error {
 
 	log.Printf("[app:Initialize] templates initialized (dev=%v)", application.options.Configuration.Core.App.Dev)
 
-	application.runtime.router = application.newRouter(contributions.MiddlewareRegistrars())
+	application.runtime.router = application.newRouter(application.options.Middleware)
 
 	httpx.RegisterStatic(application.runtime.router, application.options.StaticDir)
-	httpx.RegisterRoutes(application.runtime.router, contributions.RouteRegistrars()...)
+	httpx.RegisterRoutes(application.runtime.router, application.options.Routes...)
 
 	log.Printf("[app:Initialize] routes registered")
 
@@ -112,6 +97,8 @@ func (application *App) Start(addr string) error {
 		log.Printf("[app:Start] worker started")
 	}
 
+	defer application.close()
+
 	serverErrors := make(chan error, 1)
 	go func() {
 		log.Printf("[app:Start] server starting on %s", addr)
@@ -123,14 +110,6 @@ func (application *App) Start(addr string) error {
 
 	select {
 	case err := <-serverErrors:
-		if application.runtime.database != nil {
-			application.runtime.database.Close()
-		}
-
-		if application.runtime.logFile != nil {
-			application.runtime.logFile.Close()
-		}
-
 		return err
 	case <-shutdownContext.Done():
 		stop()
@@ -140,26 +119,22 @@ func (application *App) Start(addr string) error {
 		drainContext, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
-		err := httpServer.Shutdown(drainContext)
-
-		if application.runtime.database != nil {
-			application.runtime.database.Close()
-		}
-
-		if application.runtime.logFile != nil {
-			application.runtime.logFile.Close()
-		}
-
-		return err
+		return httpServer.Shutdown(drainContext)
 	}
 }
 
 func (application *App) close() {
+	if application.options.WorkerRuntime != nil {
+		application.options.WorkerRuntime.Close()
+	}
+
 	if application.runtime.logFile != nil {
 		application.runtime.logFile.Close()
+		application.runtime.logFile = nil
 	}
 
 	if application.runtime.database != nil {
 		application.runtime.database.Close()
+		application.runtime.database = nil
 	}
 }

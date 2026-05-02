@@ -43,6 +43,7 @@ type CoreConfig struct {
 
 	Worker struct {
 		Enabled      bool          `envconfig:"CORE_WORKER_ENABLED"       default:"false"`
+		DBPath       string        `envconfig:"CORE_WORKER_DB_PATH"       default:"./data/db/kumacore_worker.db"`
 		PollInterval time.Duration `envconfig:"CORE_WORKER_POLL_INTERVAL" default:"5s"`
 		MaxAttempts  int           `envconfig:"CORE_WORKER_MAX_ATTEMPTS"  default:"3"`
 	}
@@ -95,6 +96,10 @@ func (configuration Config) Validate() error {
 	}
 
 	if configuration.Core.Worker.Enabled {
+		if strings.TrimSpace(configuration.Core.Worker.DBPath) == "" {
+			return fmt.Errorf("[config:Validate] CORE_WORKER_DB_PATH is required")
+		}
+
 		if configuration.Core.Worker.PollInterval <= 0 {
 			return fmt.Errorf("[config:Validate] CORE_WORKER_POLL_INTERVAL must be positive")
 		}

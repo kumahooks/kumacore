@@ -2,8 +2,7 @@ package app
 
 import (
 	"context"
-	"errors"
-	"io/fs"
+	"database/sql"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -16,33 +15,25 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"kumacore/core/config"
+	coredb "kumacore/core/db"
+	"kumacore/core/db/dialect"
 	"kumacore/core/db/migrate"
-	"kumacore/core/module"
+	"kumacore/core/worker"
 )
 
-type testModule struct {
-	id       string
-	register func(module.Registrar) error
-}
-
-func (testModule testModule) ID() string {
-	return testModule.id
-}
-
-func (testModule testModule) Register(registrar module.Registrar) error {
-	if testModule.register == nil {
-		return nil
-	}
-
-	return testModule.register(registrar)
-}
-
 type testWorkerRuntime struct {
-	registeredJobs []module.JobRegistrar
+	registeredJobs []worker.Job
+	initialized    bool
 	started        bool
+	closed         bool
 }
 
-func (runtime *testWorkerRuntime) Register(jobs ...module.JobRegistrar) error {
+func (runtime *testWorkerRuntime) Initialize(ctx context.Context) error {
+	runtime.initialized = true
+	return nil
+}
+
+func (runtime *testWorkerRuntime) Register(jobs ...worker.Job) error {
 	runtime.registeredJobs = append(runtime.registeredJobs, jobs...)
 	return nil
 }
@@ -51,33 +42,37 @@ func (runtime *testWorkerRuntime) Start(ctx context.Context) {
 	runtime.started = true
 }
 
+func (runtime *testWorkerRuntime) Close() error {
+	runtime.closed = true
+	return nil
+}
+
 func TestInitialize_RegistersRoutesMiddlewareAndWorkerJobs(t *testing.T) {
 	configuration := testConfiguration(t)
 	workerRuntime := &testWorkerRuntime{}
+	database, databaseDialect := testDatabase(t)
 
 	application, err := New(Options{
 		Configuration: configuration,
-		Modules: []module.Module{
-			testModule{
-				id: "home",
-				register: func(registrar module.Registrar) error {
-					registrar.Middleware(func(next http.Handler) http.Handler {
-						return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-							writer.Header().Set("X-Test-Middleware", "registered")
-							next.ServeHTTP(writer, request)
-						})
-					})
-
-					registrar.Routes(func(router chi.Router) {
-						router.Get("/", func(writer http.ResponseWriter, request *http.Request) {
-							_, _ = writer.Write([]byte("ok"))
-						})
-					})
-
-					registrar.Jobs(module.JobRegistrar{Name: "test:job"})
-					return nil
-				},
+		Database:      database,
+		Dialect:       databaseDialect,
+		Middleware: []func(http.Handler) http.Handler{
+			func(next http.Handler) http.Handler {
+				return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+					writer.Header().Set("X-Test-Middleware", "registered")
+					next.ServeHTTP(writer, request)
+				})
 			},
+		},
+		Routes: []func(chi.Router){
+			func(router chi.Router) {
+				router.Get("/", func(writer http.ResponseWriter, request *http.Request) {
+					_, _ = writer.Write([]byte("ok"))
+				})
+			},
+		},
+		Jobs: []worker.Job{
+			{Name: "test:job", Run: func(ctx context.Context, payload any) error { return nil }},
 		},
 		FileSystem:      testFileSystem(),
 		MigrationSource: testMigrationSource(testFileSystem()),
@@ -112,55 +107,43 @@ func TestInitialize_RegistersRoutesMiddlewareAndWorkerJobs(t *testing.T) {
 		t.Fatalf("registered jobs: got %d, want 1", len(workerRuntime.registeredJobs))
 	}
 
+	if !workerRuntime.initialized {
+		t.Fatal("worker not initialized during Initialize")
+	}
+
 	if workerRuntime.started {
 		t.Fatal("worker started during Initialize")
 	}
 }
 
-func TestInitialize_InvalidModuleListAbortsBeforeDatabaseOpen(t *testing.T) {
+func TestNew_NilDatabaseReturnsError(t *testing.T) {
 	configuration := testConfiguration(t)
-	configuration.Core.DB.Path = filepath.Join(t.TempDir(), "data", "app.db")
 
-	application, err := New(Options{
+	_, err := New(Options{
 		Configuration: configuration,
-		Modules: []module.Module{
-			testModule{id: "home"},
-			testModule{id: "home"},
-		},
-		FileSystem:      testFileSystem(),
-		MigrationSource: testMigrationSource(testFileSystem()),
 	})
-	if err != nil {
-		t.Fatalf("New: %v", err)
-	}
-
-	err = application.Initialize(context.Background())
-	if err == nil || !strings.Contains(err.Error(), `duplicate module ID "home"`) {
-		t.Fatalf("Initialize: got %v, want duplicate module ID error", err)
-	}
-
-	if _, err := os.Stat(filepath.Dir(configuration.Core.DB.Path)); !errors.Is(err, fs.ErrNotExist) {
-		t.Fatalf("database dir stat: got %v, want not exist", err)
+	if err == nil || !strings.Contains(err.Error(), "nil database") {
+		t.Fatalf("New: got %v, want nil database error", err)
 	}
 }
 
 func TestInitialize_MigrationFailureClosesDatabase(t *testing.T) {
 	configuration := testConfiguration(t)
+	database, databaseDialect := testDatabase(t)
 
 	application, err := New(Options{
 		Configuration: configuration,
-		Modules: []module.Module{
-			testModule{id: "home"},
-		},
-		FileSystem: testFileSystem(),
+		Database:      database,
+		Dialect:       databaseDialect,
+		FileSystem:    testFileSystem(),
 		MigrationSource: migrate.Source{
 			Backend: "sqlite",
 			FileSystem: fstest.MapFS{
-				"app/migrations/sqlite/0002_create_widgets.sql": &fstest.MapFile{
+				"app/migrations/sqlite/app/0002_create_widgets.sql": &fstest.MapFile{
 					Data: []byte("CREATE TABLE widgets (id INTEGER PRIMARY KEY);"),
 				},
 			},
-			Directory: "app/migrations/sqlite",
+			Directory: "app/migrations/sqlite/app",
 		},
 	})
 	if err != nil {
@@ -172,18 +155,19 @@ func TestInitialize_MigrationFailureClosesDatabase(t *testing.T) {
 		t.Fatalf("Initialize: got %v, want sequence hole", err)
 	}
 
-	if application.runtime.database == nil {
-		t.Fatal("database: got nil, want opened database")
-	}
-
-	if err := application.runtime.database.PingContext(context.Background()); err == nil ||
-		!strings.Contains(err.Error(), "database is closed") {
-		t.Fatalf("database ping: got %v, want closed database", err)
+	if application.runtime.database != nil {
+		t.Fatal("database: got open handle, want nil after close")
 	}
 }
 
 func TestStart_UninitializedAppReturnsError(t *testing.T) {
-	application, err := New(Options{Configuration: testConfiguration(t)})
+	database, databaseDialect := testDatabase(t)
+
+	application, err := New(Options{
+		Configuration: testConfiguration(t),
+		Database:      database,
+		Dialect:       databaseDialect,
+	})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -210,6 +194,19 @@ func testConfiguration(t *testing.T) *config.Config {
 	return &configuration
 }
 
+func testDatabase(t *testing.T) (*sql.DB, dialect.Dialect) {
+	t.Helper()
+
+	database, databaseDialect, err := coredb.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open database: %v", err)
+	}
+
+	t.Cleanup(func() { _ = database.Close() })
+
+	return database, databaseDialect
+}
+
 func testFileSystem() fstest.MapFS {
 	return fstest.MapFS{
 		"app/web/templates/layouts/base.html": &fstest.MapFile{
@@ -218,7 +215,7 @@ func testFileSystem() fstest.MapFS {
 		"app/web/templates/components/navbar.html": &fstest.MapFile{
 			Data: []byte(`{{define "navbar"}}{{end}}`),
 		},
-		"app/migrations/sqlite/0001_create_widgets.sql": &fstest.MapFile{
+		"app/migrations/sqlite/app/0001_create_widgets.sql": &fstest.MapFile{
 			Data: []byte(`CREATE TABLE widgets (id INTEGER PRIMARY KEY);`),
 		},
 	}
@@ -228,6 +225,6 @@ func testMigrationSource(fileSystem fstest.MapFS) migrate.Source {
 	return migrate.Source{
 		Backend:    "sqlite",
 		FileSystem: fileSystem,
-		Directory:  "app/migrations/sqlite",
+		Directory:  "app/migrations/sqlite/app",
 	}
 }

@@ -7,22 +7,17 @@ import (
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 
 	"kumacore/core/httpx"
-	"kumacore/core/module"
 	"kumacore/core/security"
 )
 
-func (application *App) newRouter(moduleMiddlewares []module.MiddlewareRegistrar) *chi.Mux {
+func (application *App) newRouter(appMiddlewares []func(http.Handler) http.Handler) *chi.Mux {
 	middlewares := []func(http.Handler) http.Handler{
 		chiMiddleware.Logger,
 		chiMiddleware.Recoverer,
 		security.Middleware,
 	}
 
-	if application.options.AuthMiddleware != nil {
-		middlewares = append(middlewares, application.options.AuthMiddleware)
-	}
-
-	middlewares = append(middlewares, moduleMiddlewares...)
+	middlewares = append(middlewares, appMiddlewares...)
 
 	return httpx.NewRouter(middlewares...)
 }

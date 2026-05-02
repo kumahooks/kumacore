@@ -18,28 +18,35 @@ import (
 	"kumacore/core/config"
 	"kumacore/core/db/dialect"
 	"kumacore/core/db/migrate"
-	"kumacore/core/module"
+	"kumacore/core/httpx"
 	"kumacore/core/render"
+	"kumacore/core/worker"
 )
 
 const (
 	staticDirectory           = "app/web/static"
-	defaultMigrationDirectory = "app/migrations/sqlite"
+	defaultMigrationDirectory = "app/migrations/sqlite/app"
 )
 
 type WorkerRuntime interface {
-	Register(jobs ...module.JobRegistrar) error
+	Initialize(ctx context.Context) error
+	Register(jobs ...worker.Job) error
 	Start(ctx context.Context)
+	Close() error
 }
 
 type Options struct {
 	Configuration   *config.Config
-	Modules         []module.Module
+	Database        *sql.DB
+	Dialect         dialect.Dialect
+	// Caller must not mutate these slices after passing to New.
+	Middleware      []func(http.Handler) http.Handler
+	Routes          []httpx.RouteRegistrar
+	Jobs            []worker.Job
 	FileSystem      fs.FS
 	StaticDir       string
 	MigrationSource migrate.Source
 	Renderer        render.Renderer
-	AuthMiddleware  func(http.Handler) http.Handler
 	WorkerRuntime   WorkerRuntime
 }
 
@@ -62,6 +69,14 @@ func New(options Options) (*App, error) {
 		return nil, fmt.Errorf("[app:New] nil configuration")
 	}
 
+	if options.Database == nil {
+		return nil, fmt.Errorf("[app:New] nil database")
+	}
+
+	if options.Dialect == nil {
+		return nil, fmt.Errorf("[app:New] nil dialect")
+	}
+
 	fileSystem := options.FileSystem
 	if fileSystem == nil {
 		fileSystem = os.DirFS(options.Configuration.App.RootDir)
@@ -72,11 +87,16 @@ func New(options Options) (*App, error) {
 		staticDir = filepath.Join(options.Configuration.App.RootDir, staticDirectory)
 	}
 
-	options.Modules = append([]module.Module(nil), options.Modules...)
 	options.FileSystem = fileSystem
 	options.StaticDir = staticDir
 
-	return &App{options: options}, nil
+	return &App{
+		options: options,
+		runtime: runtime{
+			database: options.Database,
+			dialect:  options.Dialect,
+		},
+	}, nil
 }
 
 func (application *App) Address() string {
