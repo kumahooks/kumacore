@@ -36,11 +36,7 @@ func (application *App) Initialize(ctx context.Context) error {
 		return err
 	}
 
-	resolvedModules, err := registry.Resolve()
-	if err != nil {
-		application.close()
-		return err
-	}
+	resolvedModules := registry.Resolve()
 
 	if err := application.openDatabase(); err != nil {
 		application.close()
@@ -65,15 +61,20 @@ func (application *App) Initialize(ctx context.Context) error {
 		return err
 	}
 
-	templateManager, err := render.NewManager(
-		application.options.Configuration.Core.App.Dev,
-		application.options.FileSystem,
-	)
-	if err != nil {
-		application.close()
-		return fmt.Errorf("[app:Initialize] initialize renderer: %w", err)
+	if application.options.Renderer != nil {
+		application.runtime.renderer = application.options.Renderer
+	} else {
+		templateManager, err := render.NewManager(
+			application.options.Configuration.Core.App.Dev,
+			application.options.FileSystem,
+		)
+		if err != nil {
+			application.close()
+			return fmt.Errorf("[app:Initialize] initialize renderer: %w", err)
+		}
+
+		application.runtime.renderer = templateManager
 	}
-	application.runtime.renderer = templateManager
 
 	log.Printf("[app:Initialize] templates initialized (dev=%v)", application.options.Configuration.Core.App.Dev)
 
@@ -94,7 +95,6 @@ func (application *App) Start(addr string) error {
 	if application.runtime.router == nil {
 		return fmt.Errorf("[app:Start] app is not initialized")
 	}
-	defer application.close()
 
 	httpServer := &http.Server{
 		Addr:              addr,
@@ -123,6 +123,14 @@ func (application *App) Start(addr string) error {
 
 	select {
 	case err := <-serverErrors:
+		if application.runtime.database != nil {
+			application.runtime.database.Close()
+		}
+
+		if application.runtime.logFile != nil {
+			application.runtime.logFile.Close()
+		}
+
 		return err
 	case <-shutdownContext.Done():
 		stop()
@@ -132,7 +140,17 @@ func (application *App) Start(addr string) error {
 		drainContext, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
-		return httpServer.Shutdown(drainContext)
+		err := httpServer.Shutdown(drainContext)
+
+		if application.runtime.database != nil {
+			application.runtime.database.Close()
+		}
+
+		if application.runtime.logFile != nil {
+			application.runtime.logFile.Close()
+		}
+
+		return err
 	}
 }
 

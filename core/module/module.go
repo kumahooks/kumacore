@@ -12,16 +12,7 @@ import (
 // Module is an app-local feature package registered by generated bootstrap code.
 type Module interface {
 	ID() string
-	Manifest() Manifest
 	Register(registrar Registrar) error
-}
-
-// Manifest describes module identity and dependency requirements.
-type Manifest struct {
-	Name            string
-	Version         string
-	DependsOn       []string
-	ConfigKeyPrefix string
 }
 
 // Registrar collects module contributions before core app startup wires them.

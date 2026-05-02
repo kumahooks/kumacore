@@ -182,6 +182,10 @@ func readMigrationFiles(migrationSource Source) ([]migrationFile, error) {
 
 	migrationFiles := make([]migrationFile, 0, len(dirEntries))
 	for _, dirEntry := range dirEntries {
+		if strings.HasPrefix(dirEntry.Name(), ".") {
+			continue
+		}
+
 		if dirEntry.IsDir() {
 			return nil, fmt.Errorf(
 				"[database:migrate:readMigrationFiles] %s contains subdirectory %q",

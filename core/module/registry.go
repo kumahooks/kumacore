@@ -47,29 +47,21 @@ func (registry *Registry) Register(modules ...Module) error {
 	return nil
 }
 
-// Resolve returns modules in deterministic dependency order.
-func (registry *Registry) Resolve() ([]Module, error) {
+// Resolve returns modules in deterministic ID order.
+func (registry *Registry) Resolve() []Module {
 	moduleIDs := registry.sortedModuleIDs()
-	visitStateByID := make(map[string]int, len(moduleIDs))
 	resolvedModules := make([]Module, 0, len(moduleIDs))
 
 	for _, moduleID := range moduleIDs {
-		if err := registry.resolveModule(moduleID, visitStateByID, nil, &resolvedModules); err != nil {
-			return nil, err
-		}
+		resolvedModules = append(resolvedModules, registry.modulesByID[moduleID])
 	}
 
-	return resolvedModules, nil
+	return resolvedModules
 }
 
 // Contributions resolves modules and collects their registrations.
 func (registry *Registry) Contributions() (*Contributions, error) {
-	resolvedModules, err := registry.Resolve()
-	if err != nil {
-		return nil, err
-	}
-
-	return CollectContributions(resolvedModules...)
+	return CollectContributions(registry.Resolve()...)
 }
 
 // CollectContributions collects registrations from modules in caller-provided order.
@@ -92,57 +84,4 @@ func (registry *Registry) sortedModuleIDs() []string {
 	sort.Strings(moduleIDs)
 
 	return moduleIDs
-}
-
-func (registry *Registry) resolveModule(
-	moduleID string,
-	visitStateByID map[string]int,
-	path []string,
-	resolvedModules *[]Module,
-) error {
-	const visiting = 1
-	const visited = 2
-
-	if visitStateByID[moduleID] == visited {
-		return nil
-	}
-
-	if visitStateByID[moduleID] == visiting {
-		cyclePath := append(path, moduleID)
-		return fmt.Errorf("[module:resolveModule] dependency cycle: %s", strings.Join(cyclePath, " -> "))
-	}
-
-	appModule, exists := registry.modulesByID[moduleID]
-	if !exists {
-		return fmt.Errorf("[module:resolveModule] missing module %q", moduleID)
-	}
-
-	visitStateByID[moduleID] = visiting
-	dependencies := append([]string(nil), appModule.Manifest().DependsOn...)
-	sort.Strings(dependencies)
-
-	for _, dependencyID := range dependencies {
-		dependencyID = strings.TrimSpace(dependencyID)
-		if dependencyID == "" {
-			return fmt.Errorf("[module:resolveModule] %s declares empty dependency", moduleID)
-		}
-
-		if _, exists := registry.modulesByID[dependencyID]; !exists {
-			return fmt.Errorf("[module:resolveModule] %s depends on missing module %q", moduleID, dependencyID)
-		}
-
-		if err := registry.resolveModule(
-			dependencyID,
-			visitStateByID,
-			append(path, moduleID),
-			resolvedModules,
-		); err != nil {
-			return err
-		}
-	}
-
-	visitStateByID[moduleID] = visited
-	*resolvedModules = append(*resolvedModules, appModule)
-
-	return nil
 }

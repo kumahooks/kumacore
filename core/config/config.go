@@ -13,45 +13,45 @@ const sqliteDriver = "sqlite"
 
 // Config holds core and application configuration populated from environment variables.
 type Config struct {
-	Core CoreConfig `envconfig:"CORE"`
-	App  AppConfig  `envconfig:"APP"`
+	Core CoreConfig
+	App  AppConfig
 }
 
 // CoreConfig holds stable kumacore runtime configuration.
 type CoreConfig struct {
 	Server struct {
-		Host string `envconfig:"HOST" default:"127.0.0.1"`
-		Port int    `envconfig:"PORT" default:"3000"`
+		Host string `envconfig:"CORE_SERVER_HOST" default:"127.0.0.1"`
+		Port int    `envconfig:"CORE_SERVER_PORT" default:"3000"`
 	}
 
 	App struct {
-		Dev bool `envconfig:"DEV" default:"true"`
+		Dev bool `envconfig:"CORE_APP_DEV" default:"true"`
 	}
 
 	DB struct {
-		Driver string `envconfig:"DRIVER" default:"sqlite"`
-		Path   string `envconfig:"PATH"   default:"./data/kumacore.db"`
+		Driver string `envconfig:"CORE_DB_DRIVER" default:"sqlite"`
+		Path   string `envconfig:"CORE_DB_PATH"   default:"./data/db/kumacore.db"`
 	}
 
 	Logging struct {
-		Dir string `envconfig:"DIR" default:"./logs"`
-	} `envconfig:"LOG"`
+		Dir string `envconfig:"CORE_LOG_DIR" default:"./data/logs"`
+	}
 
 	Session struct {
-		TTL time.Duration `envconfig:"TTL" default:"168h"`
+		TTL time.Duration `envconfig:"CORE_SESSION_TTL" default:"168h"`
 	}
 
 	Worker struct {
-		Enabled      bool          `envconfig:"ENABLED"       default:"false"`
-		PollInterval time.Duration `envconfig:"POLL_INTERVAL" default:"5s"`
-		MaxAttempts  int           `envconfig:"MAX_ATTEMPTS"  default:"3"`
+		Enabled      bool          `envconfig:"CORE_WORKER_ENABLED"       default:"false"`
+		PollInterval time.Duration `envconfig:"CORE_WORKER_POLL_INTERVAL" default:"5s"`
+		MaxAttempts  int           `envconfig:"CORE_WORKER_MAX_ATTEMPTS"  default:"3"`
 	}
 }
 
 // AppConfig holds app-owned runtime configuration.
 type AppConfig struct {
-	Name    string `envconfig:"NAME"`
-	RootDir string `envconfig:"ROOT_DIR" default:"."`
+	Name    string `envconfig:"APP_NAME"     default:"kumacore"`
+	RootDir string `envconfig:"APP_ROOT_DIR" default:"."`
 }
 
 // Load reads environment variables into a Config using envconfig.

@@ -22,20 +22,11 @@ import (
 
 type testModule struct {
 	id       string
-	depends  []string
 	register func(module.Registrar) error
 }
 
 func (testModule testModule) ID() string {
 	return testModule.id
-}
-
-func (testModule testModule) Manifest() module.Manifest {
-	return module.Manifest{
-		Name:      testModule.id,
-		Version:   "test",
-		DependsOn: testModule.depends,
-	}
 }
 
 func (testModule testModule) Register(registrar module.Registrar) error {
@@ -126,14 +117,15 @@ func TestInitialize_RegistersRoutesMiddlewareAndWorkerJobs(t *testing.T) {
 	}
 }
 
-func TestInitialize_InvalidModuleGraphAbortsBeforeDatabaseOpen(t *testing.T) {
+func TestInitialize_InvalidModuleListAbortsBeforeDatabaseOpen(t *testing.T) {
 	configuration := testConfiguration(t)
 	configuration.Core.DB.Path = filepath.Join(t.TempDir(), "data", "app.db")
 
 	application, err := New(Options{
 		Configuration: configuration,
 		Modules: []module.Module{
-			testModule{id: "home", depends: []string{"auth"}},
+			testModule{id: "home"},
+			testModule{id: "home"},
 		},
 		FileSystem:      testFileSystem(),
 		MigrationSource: testMigrationSource(testFileSystem()),
@@ -143,8 +135,8 @@ func TestInitialize_InvalidModuleGraphAbortsBeforeDatabaseOpen(t *testing.T) {
 	}
 
 	err = application.Initialize(context.Background())
-	if err == nil || !strings.Contains(err.Error(), `depends on missing module "auth"`) {
-		t.Fatalf("Initialize: got %v, want missing dependency error", err)
+	if err == nil || !strings.Contains(err.Error(), `duplicate module ID "home"`) {
+		t.Fatalf("Initialize: got %v, want duplicate module ID error", err)
 	}
 
 	if _, err := os.Stat(filepath.Dir(configuration.Core.DB.Path)); !errors.Is(err, fs.ErrNotExist) {

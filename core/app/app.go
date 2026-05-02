@@ -38,6 +38,7 @@ type Options struct {
 	FileSystem      fs.FS
 	StaticDir       string
 	MigrationSource migrate.Source
+	Renderer        render.Renderer
 	AuthMiddleware  func(http.Handler) http.Handler
 	WorkerRuntime   WorkerRuntime
 }
@@ -51,7 +52,7 @@ type runtime struct {
 	router   *chi.Mux
 	database *sql.DB
 	dialect  dialect.Dialect
-	renderer *render.Manager
+	renderer render.Renderer
 	logFile  io.Closer
 }
 
