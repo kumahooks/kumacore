@@ -3,7 +3,6 @@ package module
 
 import (
 	"context"
-	"io/fs"
 	"net/http"
 	"time"
 
@@ -29,7 +28,6 @@ type Manifest struct {
 type Registrar interface {
 	Routes(routeRegistrar RouteRegistrar)
 	Middleware(middlewareRegistrar MiddlewareRegistrar)
-	Migrations(migrationRegistrar MigrationRegistrar)
 	Jobs(jobRegistrar JobRegistrar)
 }
 
@@ -38,14 +36,6 @@ type RouteRegistrar = httpx.RouteRegistrar
 
 // MiddlewareRegistrar is a standard HTTP middleware contribution.
 type MiddlewareRegistrar = func(http.Handler) http.Handler
-
-// MigrationRegistrar describes a module migration source for one backend.
-type MigrationRegistrar struct {
-	ModuleID   string
-	Backend    string
-	FileSystem fs.FS
-	Directory  string
-}
 
 // JobRegistrar describes a worker job contribution.
 type JobRegistrar struct {
@@ -58,7 +48,6 @@ type JobRegistrar struct {
 type Contributions struct {
 	routes     []RouteRegistrar
 	middleware []MiddlewareRegistrar
-	migrations []MigrationRegistrar
 	jobs       []JobRegistrar
 }
 
@@ -70,11 +59,6 @@ func (contributions *Contributions) Routes(routeRegistrar RouteRegistrar) {
 // Middleware appends a middleware registrar.
 func (contributions *Contributions) Middleware(middlewareRegistrar MiddlewareRegistrar) {
 	contributions.middleware = append(contributions.middleware, middlewareRegistrar)
-}
-
-// Migrations appends a migration registrar.
-func (contributions *Contributions) Migrations(migrationRegistrar MigrationRegistrar) {
-	contributions.migrations = append(contributions.migrations, migrationRegistrar)
 }
 
 // Jobs appends a job registrar.
@@ -90,11 +74,6 @@ func (contributions Contributions) RouteRegistrars() []RouteRegistrar {
 // MiddlewareRegistrars returns registered middleware contributions.
 func (contributions Contributions) MiddlewareRegistrars() []MiddlewareRegistrar {
 	return append([]MiddlewareRegistrar(nil), contributions.middleware...)
-}
-
-// MigrationRegistrars returns registered migration contributions.
-func (contributions Contributions) MigrationRegistrars() []MigrationRegistrar {
-	return append([]MigrationRegistrar(nil), contributions.migrations...)
 }
 
 // JobRegistrars returns registered job contributions.
