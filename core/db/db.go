@@ -12,7 +12,7 @@ import (
 // Open opens a database for the configured driver and returns its dialect metadata.
 func Open(driverName string, path string) (*sql.DB, dialect.Dialect, error) {
 	if driverName != sqlite.DriverName {
-		return nil, nil, fmt.Errorf("[database] unsupported driver %q", driverName)
+		return nil, nil, fmt.Errorf("[database:Open] unsupported driver %q", driverName)
 	}
 
 	database, err := sqlite.Open(path)

@@ -303,7 +303,7 @@ func loadAppliedMigrations(ctx context.Context, databaseConnection driver.DBTX) 
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("[database:migrate:loadAppliedMigrations] miterate %s: %w", trackingTableName, err)
+		return nil, fmt.Errorf("[database:migrate:loadAppliedMigrations] iterate %s: %w", trackingTableName, err)
 	}
 
 	return appliedMigrations, nil
@@ -341,7 +341,7 @@ func validateMigrations(
 		if existingAppliedMigration, exists := appliedMigrations[plannedMigration.sequence]; exists {
 			if existingAppliedMigration.filename != plannedMigration.filename {
 				return nil, fmt.Errorf(
-					"[database:migrate:trackingTableExists] migration %04d filename mismatch: got %q, want %q",
+					"[database:migrate:validateMigrations] migration %04d filename mismatch: got %q, want %q",
 					plannedMigration.sequence,
 					existingAppliedMigration.filename,
 					plannedMigration.filename,
@@ -350,7 +350,7 @@ func validateMigrations(
 
 			if existingAppliedMigration.checksumSHA256 != plannedMigration.checksum {
 				return nil, fmt.Errorf(
-					"[database:migrate:trackingTableExists] migration %04d checksum mismatch",
+					"[database:migrate:validateMigrations] migration %04d checksum mismatch",
 					plannedMigration.sequence,
 				)
 			}
@@ -369,7 +369,7 @@ func validateMigrations(
 		}
 
 		return nil, fmt.Errorf(
-			"[database:migrate:trackingTableExists] applied migration missing from filesystem: %04d (%s)",
+			"[database:migrate:validateMigrations] applied migration missing from filesystem: %04d (%s)",
 			appliedMigrationRecord.sequence,
 			appliedMigrationRecord.filename,
 		)

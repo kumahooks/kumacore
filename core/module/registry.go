@@ -29,16 +29,16 @@ func (registry *Registry) Register(modules ...Module) error {
 
 	for _, appModule := range modules {
 		if appModule == nil {
-			return fmt.Errorf("[module] register: nil module")
+			return fmt.Errorf("[module:Register] nil module")
 		}
 
 		moduleID := strings.TrimSpace(appModule.ID())
 		if moduleID == "" {
-			return fmt.Errorf("[module] register: empty module ID")
+			return fmt.Errorf("[module:Register] empty module ID")
 		}
 
 		if _, exists := registry.modulesByID[moduleID]; exists {
-			return fmt.Errorf("[module] register: duplicate module ID %q", moduleID)
+			return fmt.Errorf("[module:Register] duplicate module ID %q", moduleID)
 		}
 
 		registry.modulesByID[moduleID] = appModule
@@ -69,10 +69,15 @@ func (registry *Registry) Contributions() (*Contributions, error) {
 		return nil, err
 	}
 
+	return CollectContributions(resolvedModules...)
+}
+
+// CollectContributions collects registrations from modules in caller-provided order.
+func CollectContributions(modules ...Module) (*Contributions, error) {
 	contributions := &Contributions{}
-	for _, appModule := range resolvedModules {
+	for _, appModule := range modules {
 		if err := appModule.Register(contributions); err != nil {
-			return nil, fmt.Errorf("[module] register %s: %w", appModule.ID(), err)
+			return nil, fmt.Errorf("[module:CollectContributions] register %s: %w", appModule.ID(), err)
 		}
 	}
 
@@ -104,12 +109,12 @@ func (registry *Registry) resolveModule(
 
 	if visitStateByID[moduleID] == visiting {
 		cyclePath := append(path, moduleID)
-		return fmt.Errorf("[module] resolve: dependency cycle: %s", strings.Join(cyclePath, " -> "))
+		return fmt.Errorf("[module:resolveModule] dependency cycle: %s", strings.Join(cyclePath, " -> "))
 	}
 
 	appModule, exists := registry.modulesByID[moduleID]
 	if !exists {
-		return fmt.Errorf("[module] resolve: missing module %q", moduleID)
+		return fmt.Errorf("[module:resolveModule] missing module %q", moduleID)
 	}
 
 	visitStateByID[moduleID] = visiting
@@ -119,11 +124,11 @@ func (registry *Registry) resolveModule(
 	for _, dependencyID := range dependencies {
 		dependencyID = strings.TrimSpace(dependencyID)
 		if dependencyID == "" {
-			return fmt.Errorf("[module] resolve: %s declares empty dependency", moduleID)
+			return fmt.Errorf("[module:resolveModule] %s declares empty dependency", moduleID)
 		}
 
 		if _, exists := registry.modulesByID[dependencyID]; !exists {
-			return fmt.Errorf("[module] resolve: %s depends on missing module %q", moduleID, dependencyID)
+			return fmt.Errorf("[module:resolveModule] %s depends on missing module %q", moduleID, dependencyID)
 		}
 
 		if err := registry.resolveModule(

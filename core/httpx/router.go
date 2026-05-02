@@ -20,7 +20,12 @@ type Router interface {
 	Use(middlewares ...func(http.Handler) http.Handler)
 }
 
-// RouteRegistrar follows the meryl.moe module Routes pattern.
+// RouteRegistrar is a function that registers routes on a chi.Router.
+// Each module exposes a Routes function returning this type so that
+// route paths are owned by the module rather than the central wiring layer.
+//
+// Type alias, not a new type, so callers can return func(chi.Router)
+// without importing this package.
 type RouteRegistrar = func(chi.Router)
 
 // NewRouter creates a Chi router and applies global middleware.
@@ -31,7 +36,8 @@ func NewRouter(middlewares ...func(http.Handler) http.Handler) *chi.Mux {
 	return router
 }
 
-// RegisterRoutes delegates route ownership to app-local module registrars.
+// RegisterRoutes delegates all page routes to the provided registrars.
+// Each module registers its own paths via Routes.
 func RegisterRoutes(router chi.Router, registrars ...RouteRegistrar) {
 	for _, register := range registrars {
 		register(router)
@@ -52,7 +58,8 @@ func RegisterStatic(router chi.Router, staticDir string) {
 	})
 }
 
-// fileOnlyFS wraps http.FileSystem and rejects directory requests.
+// fileOnlyFS wraps http.FileSystem and rejects directory requests,
+// preventing directory listing on the static file server.
 type fileOnlyFS struct {
 	fileSystem http.FileSystem
 }

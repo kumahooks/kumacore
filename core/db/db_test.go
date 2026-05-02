@@ -34,7 +34,7 @@ func TestOpen_UnsupportedDriver_ReturnsError(t *testing.T) {
 		t.Fatal("dialect: got non-nil, want nil")
 	}
 
-	if !strings.Contains(err.Error(), `[database] unsupported driver "postgres"`) {
+	if !strings.Contains(err.Error(), `[database:Open] unsupported driver "postgres"`) {
 		t.Fatalf("error: got %q, want unsupported driver message", err.Error())
 	}
 }

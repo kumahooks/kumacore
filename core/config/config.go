@@ -50,14 +50,15 @@ type CoreConfig struct {
 
 // AppConfig holds app-owned runtime configuration.
 type AppConfig struct {
-	Name string `envconfig:"NAME"`
+	Name    string `envconfig:"NAME"`
+	RootDir string `envconfig:"ROOT_DIR" default:"."`
 }
 
 // Load reads environment variables into a Config using envconfig.
 func Load() (*Config, error) {
 	var configuration Config
 	if err := envconfig.Process("", &configuration); err != nil {
-		return nil, fmt.Errorf("[config] load env: %w", err)
+		return nil, fmt.Errorf("[config:Load] load env: %w", err)
 	}
 
 	if err := configuration.Validate(); err != nil {
@@ -70,41 +71,45 @@ func Load() (*Config, error) {
 // Validate fails fast on invalid critical configuration.
 func (configuration Config) Validate() error {
 	if strings.TrimSpace(configuration.Core.Server.Host) == "" {
-		return fmt.Errorf("[config] validate: CORE_SERVER_HOST is required")
+		return fmt.Errorf("[config:Validate] CORE_SERVER_HOST is required")
 	}
 
 	if configuration.Core.Server.Port < 1 || configuration.Core.Server.Port > 65535 {
-		return fmt.Errorf("[config] validate: CORE_SERVER_PORT must be between 1 and 65535")
+		return fmt.Errorf("[config:Validate] CORE_SERVER_PORT must be between 1 and 65535")
 	}
 
 	if configuration.Core.DB.Driver != sqliteDriver {
-		return fmt.Errorf("[config] validate: unsupported CORE_DB_DRIVER %q", configuration.Core.DB.Driver)
+		return fmt.Errorf("[config:Validate] unsupported CORE_DB_DRIVER %q", configuration.Core.DB.Driver)
 	}
 
 	if strings.TrimSpace(configuration.Core.DB.Path) == "" {
-		return fmt.Errorf("[config] validate: CORE_DB_PATH is required")
+		return fmt.Errorf("[config:Validate] CORE_DB_PATH is required")
 	}
 
 	if strings.TrimSpace(configuration.Core.Logging.Dir) == "" {
-		return fmt.Errorf("[config] validate: CORE_LOG_DIR is required")
+		return fmt.Errorf("[config:Validate] CORE_LOG_DIR is required")
 	}
 
 	if configuration.Core.Session.TTL <= 0 {
-		return fmt.Errorf("[config] validate: CORE_SESSION_TTL must be positive")
+		return fmt.Errorf("[config:Validate] CORE_SESSION_TTL must be positive")
 	}
 
 	if configuration.Core.Worker.Enabled {
 		if configuration.Core.Worker.PollInterval <= 0 {
-			return fmt.Errorf("[config] validate: CORE_WORKER_POLL_INTERVAL must be positive")
+			return fmt.Errorf("[config:Validate] CORE_WORKER_POLL_INTERVAL must be positive")
 		}
 
 		if configuration.Core.Worker.MaxAttempts < 1 {
-			return fmt.Errorf("[config] validate: CORE_WORKER_MAX_ATTEMPTS must be at least 1")
+			return fmt.Errorf("[config:Validate] CORE_WORKER_MAX_ATTEMPTS must be at least 1")
 		}
 	}
 
 	if strings.TrimSpace(configuration.App.Name) == "" {
-		return fmt.Errorf("[config] validate: APP_NAME is required")
+		return fmt.Errorf("[config:Validate] APP_NAME is required")
+	}
+
+	if strings.TrimSpace(configuration.App.RootDir) == "" {
+		return fmt.Errorf("[config:Validate] APP_ROOT_DIR is required")
 	}
 
 	return nil
