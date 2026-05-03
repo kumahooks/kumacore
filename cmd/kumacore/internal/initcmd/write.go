@@ -12,12 +12,15 @@ import (
 )
 
 const (
-	serverMainPath = "cmd/server/main.go"
-	goModPath      = "go.mod"
-	goSumPath      = "go.sum"
-	gitIgnorePath  = ".gitignore"
-	readmePath     = "README.md"
-	appGitKeepPath = "app/migrations/sqlite/app/.gitkeep"
+	serverMainPath     = "cmd/server/main.go"
+	serverDatabasePath = "cmd/server/database.go"
+	serverModulesPath  = "cmd/server/modules.go"
+	serverWorkerPath   = "cmd/server/worker.go"
+	goModPath          = "go.mod"
+	goSumPath          = "go.sum"
+	gitIgnorePath      = ".gitignore"
+	readmePath         = "README.md"
+	appGitKeepPath     = "app/migrations/sqlite/app/.gitkeep"
 )
 
 type fileChange struct {
@@ -69,13 +72,33 @@ func initializeRepository(stdout io.Writer, options Options) error {
 }
 
 func plannedChanges(options Options) ([]fileChange, error) {
-	serverMainBytes, err := os.ReadFile(serverMainPath)
+	renderedServerMain, err := renderProjectFile(serverMainPath, options.ProjectName)
 	if err != nil {
-		return nil, fmt.Errorf("[initcmd:plannedChanges] read %s: %w", serverMainPath, err)
+		return nil, err
 	}
 
 	repoMetadata := metadataFromOptions(options)
-	rewrittenMain, err := rewriteServerMain(serverMainBytes, repoMetadata, options.ProjectName)
+	renderedServerDatabase, err := renderProjectFile(serverDatabasePath, options.ProjectName)
+	if err != nil {
+		return nil, err
+	}
+
+	serverModulesBytes, err := os.ReadFile(serverModulesPath)
+	if err != nil {
+		return nil, fmt.Errorf("[initcmd:plannedChanges] read %s: %w", serverModulesPath, err)
+	}
+
+	rewrittenModules, err := rewriteServerModules(serverModulesBytes, repoMetadata, options.ProjectName)
+	if err != nil {
+		return nil, err
+	}
+
+	serverWorkerBytes, err := os.ReadFile(serverWorkerPath)
+	if err != nil {
+		return nil, fmt.Errorf("[initcmd:plannedChanges] read %s: %w", serverWorkerPath, err)
+	}
+
+	rewrittenWorker, err := rewriteServerWorker(serverWorkerBytes, options.ProjectName)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +120,10 @@ func plannedChanges(options Options) ([]fileChange, error) {
 		fileChange{path: goSumPath, reason: "write project file", data: goSumBytes},
 		fileChange{path: gitIgnorePath, reason: "write project file", data: renderedGitIgnore},
 		fileChange{path: readmePath, reason: "write project file", data: renderedReadme},
-		fileChange{path: serverMainPath, reason: "write generated wiring", data: rewrittenMain},
+		fileChange{path: serverMainPath, reason: "write project file", data: renderedServerMain},
+		fileChange{path: serverDatabasePath, reason: "copy scaffold file", data: renderedServerDatabase},
+		fileChange{path: serverModulesPath, reason: "write generated wiring", data: rewrittenModules},
+		fileChange{path: serverWorkerPath, reason: "write generated wiring", data: rewrittenWorker},
 		fileChange{path: appGitKeepPath, reason: "write project file", data: []byte{}},
 	)
 
@@ -335,7 +361,7 @@ func renderProjectFile(sourcePath string, projectName string) ([]byte, error) {
 	return bytes.Clone(fileData), nil
 }
 
-func rewriteServerMain(source []byte, metadata RepoMetadata, projectName string) ([]byte, error) {
+func rewriteServerModules(source []byte, metadata RepoMetadata, projectName string) ([]byte, error) {
 	rewriteSections := []struct {
 		beginMarker string
 		endMarker   string
@@ -345,11 +371,6 @@ func rewriteServerMain(source []byte, metadata RepoMetadata, projectName string)
 			beginMarker: "// kumacore:begin modules-imports",
 			endMarker:   "// kumacore:end modules-imports",
 			content:     renderModuleImports(metadata),
-		},
-		{
-			beginMarker: "// kumacore:begin jobs-imports",
-			endMarker:   "// kumacore:end jobs-imports",
-			content:     renderJobImports(metadata),
 		},
 		{
 			beginMarker: "// kumacore:begin modules-setup",
@@ -366,6 +387,22 @@ func rewriteServerMain(source []byte, metadata RepoMetadata, projectName string)
 			endMarker:   "// kumacore:end modules-routes",
 			content:     renderModuleRoutes(metadata),
 		},
+	}
+
+	return rewriteMarkedSource(source, rewriteSections, projectName)
+}
+
+func rewriteServerWorker(source []byte, projectName string) ([]byte, error) {
+	rewriteSections := []struct {
+		beginMarker string
+		endMarker   string
+		content     string
+	}{
+		{
+			beginMarker: "// kumacore:begin jobs-imports",
+			endMarker:   "// kumacore:end jobs-imports",
+			content:     renderJobImports(RepoMetadata{}),
+		},
 		{
 			beginMarker: "// kumacore:begin jobs-register",
 			endMarker:   "// kumacore:end jobs-register",
@@ -373,6 +410,18 @@ func rewriteServerMain(source []byte, metadata RepoMetadata, projectName string)
 		},
 	}
 
+	return rewriteMarkedSource(source, rewriteSections, projectName)
+}
+
+func rewriteMarkedSource(
+	source []byte,
+	rewriteSections []struct {
+		beginMarker string
+		endMarker   string
+		content     string
+	},
+	projectName string,
+) ([]byte, error) {
 	rewrittenSource := string(source)
 	for _, rewriteSection := range rewriteSections {
 		nextSource, err := replaceMarkedRegion(

@@ -35,7 +35,7 @@ HTTP-facing modules live under `app/modules/`. They own routes, handlers, and re
 ```sh
 go run ./cmd/kumacore/main.go init myapp
 cd myapp
-go run cmd/server/main.go
+go run ./cmd/server
 ```
 
 Runtime-generated files live under `data/`.
@@ -70,4 +70,3 @@ Startup validates the migration stream before executing anything. Invalid filena
 ## Public Contract
 
 Surfaces and behaviors are documented in [CONTRACT.md](./CONTRACT.md).
-
