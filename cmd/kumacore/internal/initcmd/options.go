@@ -32,34 +32,34 @@ func defaultModules() []string {
 func validateProjectName(name string) error {
 	trimmed := strings.TrimSpace(name)
 	if trimmed == "" {
-		return fmt.Errorf("[initcmd] project name is required")
+		return fmt.Errorf("[initcmd:validateProjectName] project name is required")
 	}
 
 	if trimmed == "." || trimmed == ".." {
-		return fmt.Errorf("[initcmd] project name %q is invalid", name)
+		return fmt.Errorf("[initcmd:validateProjectName] project name %q is invalid", name)
 	}
 
 	if filepath.Base(trimmed) != trimmed {
-		return fmt.Errorf("[initcmd] project name %q is invalid", name)
+		return fmt.Errorf("[initcmd:validateProjectName] project name %q is invalid", name)
 	}
 
 	if strings.ContainsAny(trimmed, `\ /`) {
-		return fmt.Errorf("[initcmd] project name %q is invalid", name)
+		return fmt.Errorf("[initcmd:validateProjectName] project name %q is invalid", name)
 	}
 
 	for index, character := range trimmed {
 		if !isAllowedProjectNameCharacter(character) {
-			return fmt.Errorf("[initcmd] project name %q is invalid", name)
+			return fmt.Errorf("[initcmd:validateProjectName] project name %q is invalid", name)
 		}
 
 		if index == 0 && !unicode.IsLower(character) {
-			return fmt.Errorf("[initcmd] project name %q is invalid", name)
+			return fmt.Errorf("[initcmd:validateProjectName] project name %q is invalid", name)
 		}
 	}
 
 	lastCharacter := rune(trimmed[len(trimmed)-1])
 	if !(unicode.IsLower(lastCharacter) || unicode.IsDigit(lastCharacter)) {
-		return fmt.Errorf("[initcmd] project name %q is invalid", name)
+		return fmt.Errorf("[initcmd:validateProjectName] project name %q is invalid", name)
 	}
 
 	return nil

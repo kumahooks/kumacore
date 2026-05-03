@@ -18,11 +18,11 @@ func validateModules(ids []string) error {
 	seenModules := make(map[string]struct{}, len(ids))
 	for _, id := range ids {
 		if !KnownModule(id) {
-			return fmt.Errorf("[initcmd] unknown module %q", id)
+			return fmt.Errorf("[initcmd:validateModules] unknown module %q", id)
 		}
 
 		if _, exists := seenModules[id]; exists {
-			return fmt.Errorf("[initcmd] duplicate module %q", id)
+			return fmt.Errorf("[initcmd:validateModules] duplicate module %q", id)
 		}
 
 		seenModules[id] = struct{}{}

@@ -3,11 +3,13 @@ package app
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -26,14 +28,24 @@ type testWorkerRuntime struct {
 	initialized    bool
 	started        bool
 	closed         bool
+	initializeErr  error
+	registerErr    error
 }
 
 func (runtime *testWorkerRuntime) Initialize(ctx context.Context) error {
+	if runtime.initializeErr != nil {
+		return runtime.initializeErr
+	}
+
 	runtime.initialized = true
 	return nil
 }
 
 func (runtime *testWorkerRuntime) Register(jobs ...worker.Job) error {
+	if runtime.registerErr != nil {
+		return runtime.registerErr
+	}
+
 	runtime.registeredJobs = append(runtime.registeredJobs, jobs...)
 	return nil
 }
@@ -175,6 +187,118 @@ func TestStart_UninitializedAppReturnsError(t *testing.T) {
 	err = application.Start("127.0.0.1:0")
 	if err == nil || !strings.Contains(err.Error(), "app is not initialized") {
 		t.Fatalf("Start: got %v, want uninitialized error", err)
+	}
+}
+
+func TestInitialize_AppMiddlewareRunsInOrder(t *testing.T) {
+	configuration := testConfiguration(t)
+	database, databaseDialect := testDatabase(t)
+
+	callOrder := make([]string, 0, 3)
+	application, err := New(Options{
+		Configuration: configuration,
+		Database:      database,
+		Dialect:       databaseDialect,
+		Middleware: []func(http.Handler) http.Handler{
+			func(next http.Handler) http.Handler {
+				return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+					callOrder = append(callOrder, "first")
+					next.ServeHTTP(writer, request)
+				})
+			},
+			func(next http.Handler) http.Handler {
+				return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+					callOrder = append(callOrder, "second")
+					next.ServeHTTP(writer, request)
+				})
+			},
+		},
+		Routes: []func(chi.Router){
+			func(router chi.Router) {
+				router.Get("/", func(writer http.ResponseWriter, request *http.Request) {
+					callOrder = append(callOrder, "handler")
+					writer.WriteHeader(http.StatusNoContent)
+				})
+			},
+		},
+		FileSystem:      testFileSystem(),
+		MigrationSource: testMigrationSource(testFileSystem()),
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(application.close)
+
+	if err := application.Initialize(context.Background()); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+
+	responseRecorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	application.Router().ServeHTTP(responseRecorder, request)
+
+	expectedCallOrder := []string{"first", "second", "handler"}
+	if !slices.Equal(callOrder, expectedCallOrder) {
+		t.Fatalf("call order: got %v, want %v", callOrder, expectedCallOrder)
+	}
+}
+
+func TestInitialize_WorkerInitializationFailureClosesDatabase(t *testing.T) {
+	configuration := testConfiguration(t)
+	database, databaseDialect := testDatabase(t)
+
+	application, err := New(Options{
+		Configuration:   configuration,
+		Database:        database,
+		Dialect:         databaseDialect,
+		FileSystem:      testFileSystem(),
+		MigrationSource: testMigrationSource(testFileSystem()),
+		WorkerRuntime: &testWorkerRuntime{
+			initializeErr: errors.New("worker init failed"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	err = application.Initialize(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "initialize worker") {
+		t.Fatalf("Initialize: got %v, want initialize worker error", err)
+	}
+
+	if application.runtime.database != nil {
+		t.Fatal("database: got open handle, want nil after worker initialization failure")
+	}
+}
+
+func TestInitialize_WorkerRegisterFailureClosesDatabase(t *testing.T) {
+	configuration := testConfiguration(t)
+	database, databaseDialect := testDatabase(t)
+
+	application, err := New(Options{
+		Configuration:   configuration,
+		Database:        database,
+		Dialect:         databaseDialect,
+		FileSystem:      testFileSystem(),
+		MigrationSource: testMigrationSource(testFileSystem()),
+		Jobs: []worker.Job{
+			{Name: "test:job", Run: func(ctx context.Context, payload any) error { return nil }},
+		},
+		WorkerRuntime: &testWorkerRuntime{
+			registerErr: errors.New("worker register failed"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	err = application.Initialize(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "register worker jobs") {
+		t.Fatalf("Initialize: got %v, want register worker jobs error", err)
+	}
+
+	if application.runtime.database != nil {
+		t.Fatal("database: got open handle, want nil after worker register failure")
 	}
 }
 

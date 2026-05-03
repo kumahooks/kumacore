@@ -174,6 +174,46 @@ func TestApply_RejectsTamperedAppliedMigrationBeforeExecution(t *testing.T) {
 	}
 }
 
+func TestApply_RejectsTamperedAppliedMigrationBeforePendingExecution(t *testing.T) {
+	database := mustOpenDatabase(t)
+	defer database.Close()
+
+	filesystem := fstest.MapFS{
+		"migrations/sqlite/.gitkeep": &fstest.MapFile{Data: []byte{}},
+		"migrations/sqlite/0001_create_users.sql": &fstest.MapFile{
+			Data: []byte(`CREATE TABLE users (id INTEGER PRIMARY KEY);`),
+		},
+		"migrations/sqlite/0002_create_sessions.sql": &fstest.MapFile{
+			Data: []byte(`CREATE TABLE sessions (id INTEGER PRIMARY KEY);`),
+		},
+	}
+
+	err := Apply(context.Background(), database, sqlite.Dialect{}, migrationSource(filesystem))
+	if err != nil {
+		t.Fatalf("initial Apply: %v", err)
+	}
+
+	filesystem["migrations/sqlite/0001_create_users.sql"].Data = []byte(
+		`CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT NOT NULL);`,
+	)
+	filesystem["migrations/sqlite/0003_create_roles.sql"] = &fstest.MapFile{
+		Data: []byte(`CREATE TABLE roles (id INTEGER PRIMARY KEY);`),
+	}
+
+	err = Apply(context.Background(), database, sqlite.Dialect{}, migrationSource(filesystem))
+	if err == nil || !strings.Contains(err.Error(), "checksum mismatch") {
+		t.Fatalf("Apply tampered migration with pending file: got %v, want checksum mismatch", err)
+	}
+
+	if count := appliedMigrationCount(t, database); count != 2 {
+		t.Fatalf("applied migration count: got %d, want 2", count)
+	}
+
+	if tableExists(t, database, "roles") {
+		t.Fatal("roles table: got present, want absent")
+	}
+}
+
 func TestApply_RejectsSequenceHoleBeforeExecution(t *testing.T) {
 	database := mustOpenDatabase(t)
 	defer database.Close()
@@ -270,6 +310,81 @@ func TestApply_RejectsAppliedSequenceHole(t *testing.T) {
 	err := Apply(context.Background(), database, sqlite.Dialect{}, migrationSource(filesystem))
 	if err == nil || !strings.Contains(err.Error(), "applied sequence hole") {
 		t.Fatalf("Apply applied hole: got %v, want applied sequence hole", err)
+	}
+}
+
+func TestValidate_IgnoresDotfiles(t *testing.T) {
+	database := mustOpenDatabase(t)
+	defer database.Close()
+
+	filesystem := fstest.MapFS{
+		"migrations/sqlite/.gitkeep": &fstest.MapFile{Data: []byte{}},
+		"migrations/sqlite/.notes":   &fstest.MapFile{Data: []byte("ignored")},
+		"migrations/sqlite/0001_create_users.sql": &fstest.MapFile{
+			Data: []byte(`CREATE TABLE users (id INTEGER PRIMARY KEY);`),
+		},
+	}
+
+	plan, err := Validate(context.Background(), database, sqlite.Dialect{}, migrationSource(filesystem))
+	if err != nil {
+		t.Fatalf("Validate: %v", err)
+	}
+
+	if plan.PendingCount() != 1 {
+		t.Fatalf("pending count: got %d, want 1", plan.PendingCount())
+	}
+}
+
+func TestApply_RejectsInvalidFilenameBeforeExecution(t *testing.T) {
+	database := mustOpenDatabase(t)
+	defer database.Close()
+
+	filesystem := fstest.MapFS{
+		"migrations/sqlite/0001_create_users.sql": &fstest.MapFile{
+			Data: []byte(`CREATE TABLE users (id INTEGER PRIMARY KEY);`),
+		},
+		"migrations/sqlite/not_a_migration.sql": &fstest.MapFile{
+			Data: []byte(`CREATE TABLE sessions (id INTEGER PRIMARY KEY);`),
+		},
+	}
+
+	err := Apply(context.Background(), database, sqlite.Dialect{}, migrationSource(filesystem))
+	if err == nil || !strings.Contains(err.Error(), "invalid filename") {
+		t.Fatalf("Apply invalid filename: got %v, want invalid filename", err)
+	}
+
+	if tableExists(t, database, trackingTableName) {
+		t.Fatal("schema_migrations table: got present, want absent")
+	}
+}
+
+func TestApply_RejectsMissingAppliedMigrationFileBeforeExecution(t *testing.T) {
+	database := mustOpenDatabase(t)
+	defer database.Close()
+
+	filesystem := fstest.MapFS{
+		"migrations/sqlite/0001_create_users.sql": &fstest.MapFile{
+			Data: []byte(`CREATE TABLE users (id INTEGER PRIMARY KEY);`),
+		},
+	}
+
+	mustCreateTrackingTable(t, database)
+	mustInsertAppliedMigration(
+		t,
+		database,
+		1,
+		"0001_create_users.sql",
+		checksumForFile(t, filesystem, "migrations/sqlite/0001_create_users.sql"),
+	)
+	mustInsertAppliedMigration(t, database, 2, "0002_create_sessions.sql", "checksum-two")
+
+	err := Apply(context.Background(), database, sqlite.Dialect{}, migrationSource(filesystem))
+	if err == nil || !strings.Contains(err.Error(), "missing from filesystem") {
+		t.Fatalf("Apply missing applied migration file: got %v, want missing from filesystem", err)
+	}
+
+	if count := appliedMigrationCount(t, database); count != 2 {
+		t.Fatalf("applied migration count: got %d, want 2", count)
 	}
 }
 
