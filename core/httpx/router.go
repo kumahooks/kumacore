@@ -2,9 +2,12 @@
 package httpx
 
 import (
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -46,8 +49,10 @@ func RegisterRoutes(router chi.Router, registrars ...RouteRegistrar) {
 
 // RegisterStatic mounts static files and conventional metadata files.
 func RegisterStatic(router chi.Router, staticDir string) {
-	fileServer := http.FileServer(fileOnlyFS{fileSystem: http.Dir(staticDir)})
-	router.Handle("/static/*", http.StripPrefix("/static/", fileServer))
+	staticFileHandler := newStaticFileHandler(staticDir)
+
+	router.Get("/static/*", staticFileHandler)
+	router.Head("/static/*", staticFileHandler)
 
 	router.Get("/robots.txt", func(writer http.ResponseWriter, request *http.Request) {
 		http.ServeFile(writer, request, filepath.Join(staticDir, "robots.txt"))
@@ -56,6 +61,66 @@ func RegisterStatic(router chi.Router, staticDir string) {
 	router.Get("/.well-known/security.txt", func(writer http.ResponseWriter, request *http.Request) {
 		http.ServeFile(writer, request, filepath.Join(staticDir, ".well-known", "security.txt"))
 	})
+}
+
+// newStaticFileHandler serves files from staticDir.
+//
+// This handler sets cache validators and content metadata for static files.
+func newStaticFileHandler(staticDir string) http.HandlerFunc {
+	staticFileSystem := fileOnlyFS{fileSystem: http.Dir(staticDir)}
+
+	return func(writer http.ResponseWriter, request *http.Request) {
+		filePath := chi.URLParam(request, "*")
+		file, err := staticFileSystem.Open(filePath)
+		if err != nil {
+			http.NotFound(writer, request)
+			return
+		}
+		defer file.Close()
+
+		fileInfo, err := file.Stat()
+		if err != nil {
+			http.NotFound(writer, request)
+			return
+		}
+
+		modificationTime := fileInfo.ModTime()
+		entityTag := calculateStaticEntityTag(fileInfo)
+
+		responseHeader := writer.Header()
+		responseHeader.Set("Cache-Control", "no-cache")
+		responseHeader.Add("Vary", "Accept-Encoding")
+		if entityTag != "" {
+			responseHeader.Set("Etag", entityTag)
+		}
+
+		if responseHeader.Get("Content-Type") == "" {
+			mimeType := mime.TypeByExtension(filepath.Ext(filePath))
+			if mimeType == "" {
+				// Go will sniff the content-type: https://www.youtube.com/watch?v=8t8JYpt0egE
+				responseHeader["Content-Type"] = nil
+			} else {
+				responseHeader.Set("Content-Type", mimeType)
+			}
+		}
+
+		http.ServeContent(writer, request, fileInfo.Name(), modificationTime, file)
+	}
+}
+
+func calculateStaticEntityTag(fileInfo os.FileInfo) string {
+	modificationTime := fileInfo.ModTime()
+	if modificationTimeUnix := modificationTime.Unix(); modificationTimeUnix == 0 || modificationTimeUnix == 1 {
+		return ""
+	}
+
+	var entityTagBuilder strings.Builder
+	entityTagBuilder.WriteRune('"')
+	entityTagBuilder.WriteString(strconv.FormatInt(modificationTime.UnixNano(), 36))
+	entityTagBuilder.WriteString(strconv.FormatInt(fileInfo.Size(), 36))
+	entityTagBuilder.WriteRune('"')
+
+	return entityTagBuilder.String()
 }
 
 // fileOnlyFS wraps http.FileSystem and rejects directory requests,
