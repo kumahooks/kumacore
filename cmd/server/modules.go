@@ -16,6 +16,7 @@ import (
 	authservice "kumacore/app/services/auth"
 	// kumacore:end modules-imports
 
+	"kumacore/core/cache"
 	"kumacore/core/config"
 	"kumacore/core/db/dialect"
 	"kumacore/core/render"
@@ -32,14 +33,17 @@ func buildModules(
 	renderer render.Renderer,
 	appDatabase *sql.DB,
 	appDialect dialect.Dialect,
+	enqueuer dispatchRunner,
 ) (moduleBootstrap, error) {
 	_ = fileSystem
 	_ = appDatabase
 	_ = appDialect
+	_ = enqueuer
 
 	// kumacore:begin modules-setup
 	authRepository := authrepository.NewRepository(appDatabase)
-	authService, err := authservice.NewService(authRepository, configuration.Core.Session.TTL)
+	userCache := cache.NewCache[string, authservice.CachedUser](configuration.Core.Session.CacheTTL)
+	authService, err := authservice.NewService(authRepository, configuration.Core.Session.TTL, userCache)
 	if err != nil {
 		return moduleBootstrap{}, err
 	}
@@ -50,7 +54,7 @@ func buildModules(
 	healthHandler := healthmodule.NewHandler(
 		appDatabase,
 		appDialect,
-		newAppMigrationSource(fileSystem, appDialect),
+		newAppMigrationSource(),
 	)
 	// kumacore:end modules-setup
 

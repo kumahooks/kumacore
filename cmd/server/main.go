@@ -17,6 +17,10 @@ func main() {
 		log.Fatalf("[server:main] load config: %v", err)
 	}
 
+	if err = os.MkdirAll(configuration.Core.Backup.Dir, 0o755); err != nil {
+		log.Fatalf("[server:main] create backup directory: %v", err)
+	}
+
 	fileSystem := os.DirFS(configuration.App.RootDir)
 
 	renderer, err := render.NewManager(configuration.Core.App.Dev, fileSystem)
@@ -29,25 +33,26 @@ func main() {
 		log.Fatalf("[server:main] open app database: %v", err)
 	}
 
-	modules, err := buildModules(configuration, fileSystem, renderer, appDatabase, appDialect)
-	if err != nil {
-		log.Fatalf("[server:main] build modules: %v", err)
-	}
-
-	workerRuntime, err := buildWorkerBootstrap(configuration, fileSystem)
+	workerRuntime, err := buildWorkerBootstrap(configuration, appDatabase)
 	if err != nil {
 		log.Fatalf("[server:main] build worker bootstrap: %v", err)
 	}
 
+	modules, err := buildModules(configuration, fileSystem, renderer, appDatabase, appDialect, workerRuntime.enqueuer)
+	if err != nil {
+		log.Fatalf("[server:main] build modules: %v", err)
+	}
+
 	options := app.Options{
-		Configuration: configuration,
-		Database:      appDatabase,
-		Dialect:       appDialect,
-		Middleware:    modules.middleware,
-		Routes:        modules.routes,
-		Jobs:          workerRuntime.jobs,
-		FileSystem:    fileSystem,
-		Renderer:      renderer,
+		Configuration:   configuration,
+		Database:        appDatabase,
+		Dialect:         appDialect,
+		Middleware:      modules.middleware,
+		Routes:          modules.routes,
+		Jobs:            workerRuntime.jobs,
+		FileSystem:      fileSystem,
+		MigrationSource: newAppMigrationSource(),
+		Renderer:        renderer,
 	}
 
 	if workerRuntime.runtime != nil {
