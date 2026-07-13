@@ -245,7 +245,10 @@ func plannedProjectFiles(options Options) ([]fileChange, error) {
 	selectedPaths := []string{
 		"core",
 		"app/jobs/logging",
+		"app/migrations/embed.go",
+		"app/migrations/source.go",
 		"app/migrations/sqlite/worker",
+		"app/testing",
 		"app/web",
 	}
 
