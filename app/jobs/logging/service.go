@@ -12,45 +12,44 @@ import (
 const logRetentionDays = 30
 
 func deleteOldLogs(dir string) (int, error) {
-	entries, err := os.ReadDir(dir)
+	dirEntries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return 0, nil
 		}
 
-		return 0, fmt.Errorf("[logging:job] read log dir: %w", err)
+		return 0, fmt.Errorf("[logging:deleteOldLogs] read log dir: %w", err)
 	}
 
-	cutoff := time.Now().AddDate(0, 0, -logRetentionDays)
-	deleted := 0
+	cutoffDate := time.Now().UTC().AddDate(0, 0, -logRetentionDays)
+	deletedLogCount := 0
 
-	for _, entry := range entries {
-		if entry.IsDir() {
+	for _, dirEntry := range dirEntries {
+		if dirEntry.IsDir() {
 			continue
 		}
 
-		name := entry.Name()
+		name := dirEntry.Name()
 		if !strings.HasSuffix(name, "_app.log") {
 			continue
 		}
 
-		dateStr := strings.TrimSuffix(name, "_app.log")
-
-		date, err := time.Parse("2006-01-02", dateStr)
+		dateString := strings.TrimSuffix(name, "_app.log")
+		logDate, err := time.Parse("2006-01-02", dateString)
 		if err != nil {
 			continue
 		}
 
-		if date.Before(cutoff) {
-			path := filepath.Join(dir, name)
-			if err := os.Remove(path); err != nil {
-				log.Printf("[logging:job] cleanup: remove %s: %v", name, err)
+		if logDate.Before(cutoffDate) {
+			logPath := filepath.Join(dir, name)
+			if err := os.Remove(logPath); err != nil {
+				log.Printf("[logging:deleteOldLogs] remove %s: %v", name, err)
 				continue
 			}
 
-			deleted++
+			deletedLogCount++
 		}
 	}
 
-	return deleted, nil
+	return deletedLogCount, nil
 }
