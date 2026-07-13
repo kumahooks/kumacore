@@ -14,21 +14,38 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"kumacore/app/repositories/auth"
+	authrepository "kumacore/app/repositories/auth"
+	"kumacore/core/cache"
 )
 
 // ErrInvalidCredentials is returned by Authenticate when credentials are invalid.
 var ErrInvalidCredentials = errors.New("invalid credentials")
+
+// CachedUser wraps a User with the session expiry timestamp so the cache
+// can reject entries whose underlying session has expired even if the
+// cache TTL has not elapsed.
+type CachedUser struct {
+	User      User
+	ExpiresAt int64
+}
 
 // Service manages credential validation, session creation, and session deletion.
 type Service struct {
 	repository        authrepository.Repository
 	sessionTTL        time.Duration
 	dummyPasswordHash []byte
+	userCache         *cache.Cache[string, CachedUser]
 }
 
 // NewService creates a Service backed by the given repository.
-func NewService(repository authrepository.Repository, sessionTTL time.Duration) (*Service, error) {
+func NewService(
+	repository authrepository.Repository,
+	sessionTTL time.Duration,
+	userCache *cache.Cache[string, CachedUser],
+) (*Service, error) {
+	if userCache == nil {
+		return nil, fmt.Errorf("[auth:NewService] userCache is required")
+	}
 	dummyPasswordHash, err := bcrypt.GenerateFromPassword([]byte("owo7"), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, fmt.Errorf("[auth:NewService] generate dummy password hash: %w", err)
@@ -38,6 +55,7 @@ func NewService(repository authrepository.Repository, sessionTTL time.Duration) 
 		repository:        repository,
 		sessionTTL:        sessionTTL,
 		dummyPasswordHash: dummyPasswordHash,
+		userCache:         userCache,
 	}, nil
 }
 
@@ -69,7 +87,7 @@ func (service *Service) Authenticate(
 		return "", time.Time{}, fmt.Errorf("[auth:Authenticate] generate token: %w", err)
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 	expiresAt = now.Add(service.sessionTTL)
 
 	if err := service.repository.CreateSession(
@@ -77,7 +95,7 @@ func (service *Service) Authenticate(
 		tokenHash,
 		credentials.UserID,
 		now.Unix(),
-		expiresAt.Unix(),
+		expiresAt.UTC().Unix(),
 	); err != nil {
 		return "", time.Time{}, fmt.Errorf("[auth:Authenticate] create session: %w", err)
 	}
@@ -97,12 +115,22 @@ func (service *Service) Logout(ctx context.Context, rawToken string) error {
 		return fmt.Errorf("[auth:Logout] delete session: %w", err)
 	}
 
+	service.userCache.Remove(tokenHash)
+
 	return nil
 }
 
 // UserForToken returns the authenticated user for a valid raw session token.
 func (service *Service) UserForToken(ctx context.Context, rawToken string, now time.Time) (User, error) {
 	tokenHash := HashToken(rawToken)
+
+	if cached, ok := service.userCache.Get(tokenHash); ok {
+		if cached.ExpiresAt <= now.Unix() {
+			service.userCache.Remove(tokenHash)
+		} else {
+			return cached.User, nil
+		}
+	}
 
 	sessionUser, err := service.repository.FindSessionUser(ctx, tokenHash, now.Unix())
 	if err != nil {
@@ -119,6 +147,10 @@ func (service *Service) UserForToken(ctx context.Context, rawToken string, now t
 	for _, rolePermissions := range permissions {
 		user.Permissions |= rolePermissions
 	}
+
+	// Cache the user with the session expiry so cache hits can reject
+	// expired sessions regardless of the cache TTL.
+	service.userCache.Set(tokenHash, CachedUser{User: user, ExpiresAt: sessionUser.ExpiresAt})
 
 	return user, nil
 }
