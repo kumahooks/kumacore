@@ -37,7 +37,7 @@ func Routes(handler *Handler) func(chi.Router) {
 		router.Post("/auth", handler.Authenticate)
 		router.Post("/auth/logout", handler.Logout)
 
-		router.With(authmiddleware.RequireAuth).Get("/auth/me", handler.Me)
+		router.With(authmiddleware.RequireAuth(handler.authService)).Get("/auth/me", handler.Me)
 	}
 }
 
