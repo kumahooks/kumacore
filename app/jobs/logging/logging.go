@@ -6,15 +6,15 @@ import (
 	"log"
 )
 
-// Cleanup deletes log files older than 30 days from dir.
+// Cleanup deletes log files older than the retention period.
 func Cleanup(_ context.Context, dir string) error {
-	deleted, err := deleteOldLogs(dir)
+	deletedLogCount, err := deleteOldLogs(dir)
 	if err != nil {
 		return err
 	}
 
-	if deleted > 0 {
-		log.Printf("[logging:job] cleanup: deleted %d old log file(s)", deleted)
+	if deletedLogCount > 0 {
+		log.Printf("[logging:Cleanup] deleted %d old log file(s)", deletedLogCount)
 	}
 
 	return nil
