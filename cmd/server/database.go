@@ -3,19 +3,14 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 
+	"kumacore/app/migrations"
 	"kumacore/core/config"
 	"kumacore/core/db"
 	"kumacore/core/db/dialect"
 	"kumacore/core/db/migrate"
-)
-
-const (
-	appMigrationDirectory    = "app/migrations/sqlite/app"
-	workerMigrationDirectory = "app/migrations/sqlite/worker"
 )
 
 func openAppDatabase(configuration *config.Config) (*sql.DB, dialect.Dialect, error) {
@@ -50,18 +45,10 @@ func openWorkerDatabase(configuration *config.Config) (*sql.DB, dialect.Dialect,
 	return databaseConnection, databaseDialect, nil
 }
 
-func newAppMigrationSource(fileSystem fs.FS, databaseDialect dialect.Dialect) migrate.Source {
-	return migrate.Source{
-		Backend:    databaseDialect.Name(),
-		FileSystem: fileSystem,
-		Directory:  appMigrationDirectory,
-	}
+func newAppMigrationSource() migrate.Source {
+	return migrations.AppSource()
 }
 
-func newWorkerMigrationSource(fileSystem fs.FS, databaseDialect dialect.Dialect) migrate.Source {
-	return migrate.Source{
-		Backend:    databaseDialect.Name(),
-		FileSystem: fileSystem,
-		Directory:  workerMigrationDirectory,
-	}
+func newWorkerMigrationSource() migrate.Source {
+	return migrations.WorkerSource()
 }
