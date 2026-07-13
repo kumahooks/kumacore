@@ -38,7 +38,12 @@ type CoreConfig struct {
 	}
 
 	Session struct {
-		TTL time.Duration `envconfig:"CORE_SESSION_TTL" default:"168h"`
+		TTL      time.Duration `envconfig:"CORE_SESSION_TTL"       default:"168h"`
+		CacheTTL time.Duration `envconfig:"CORE_SESSION_CACHE_TTL" default:"5m"`
+	}
+
+	Backup struct {
+		Dir string `envconfig:"CORE_BACKUP_DIR" default:"./backup"`
 	}
 
 	Worker struct {
@@ -93,6 +98,14 @@ func (configuration Config) Validate() error {
 
 	if configuration.Core.Session.TTL <= 0 {
 		return fmt.Errorf("[config:Validate] CORE_SESSION_TTL must be positive")
+	}
+
+	if configuration.Core.Session.CacheTTL < 0 {
+		return fmt.Errorf("[config:Validate] CORE_SESSION_CACHE_TTL must be non-negative")
+	}
+
+	if strings.TrimSpace(configuration.Core.Backup.Dir) == "" {
+		return fmt.Errorf("[config:Validate] CORE_BACKUP_DIR is required")
 	}
 
 	if configuration.Core.Worker.Enabled {
