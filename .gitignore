@@ -1,4 +1,6 @@
 .agent/*
 data/*
+kumacore
+server
 tmp/*
-
+backup/*

@@ -43,11 +43,11 @@ func NewManager(isDevelopment bool, fileSystem fs.FS) (*Manager, error) {
 	baseTemplate := template.New("")
 
 	if _, err := baseTemplate.ParseFS(fileSystem, layoutsPattern); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("[render:NewManager] parse layouts: %w", err)
 	}
 
 	if _, err := baseTemplate.ParseFS(fileSystem, componentsPattern); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("[render:NewManager] parse components: %w", err)
 	}
 
 	return &Manager{

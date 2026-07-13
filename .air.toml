@@ -1,0 +1,9 @@
+[build]
+	cmd = "go build -o ./tmp/server ./cmd/server"
+	bin = "./tmp/server"
+	include_ext = ["go", "html", "css", "js"]
+	exclude_dir = ["tmp", "vendor", "tests", "static"]
+	delay = 500
+
+[misc]
+	clean_on_exit = true
