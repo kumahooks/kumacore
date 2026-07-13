@@ -27,8 +27,9 @@ type Credentials struct {
 }
 
 type SessionUser struct {
-	ID       string
-	Username string
+	ID        string
+	Username  string
+	ExpiresAt int64
 }
 
 // Repository owns auth persistence.
@@ -101,7 +102,7 @@ func (repository *SQLRepository) FindSessionUser(
 ) (SessionUser, error) {
 	var user SessionUser
 	err := repository.databaseConnection.QueryRowContext(ctx, findSessionUserQuery, tokenHash, nowUnix).
-		Scan(&user.ID, &user.Username)
+		Scan(&user.ID, &user.Username, &user.ExpiresAt)
 
 	return user, err
 }
