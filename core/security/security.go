@@ -11,7 +11,7 @@ func Middleware(next http.Handler) http.Handler {
 		writer.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		writer.Header().Set(
 			"Content-Security-Policy",
-			"default-src 'self'; style-src 'self' 'sha256-faU7yAF8NxuMTNEwVmBz+VcYeIoBQ2EMHW3WaVxCvnk='; style-src-attr 'unsafe-inline'; script-src 'self'; img-src 'self'",
+			"default-src 'self'; style-src 'self' 'sha256-faU7yAF8NxuMTNEwVmBz+VcYeIoBQ2EMHW3WaVxCvnk=' 'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='; style-src-attr 'unsafe-inline'; script-src 'self'; img-src 'self'",
 		)
 
 		next.ServeHTTP(writer, request)
