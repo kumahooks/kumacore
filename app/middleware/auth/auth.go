@@ -1,4 +1,4 @@
-// Package authmiddleware contains HTTP middleware for session authentication.
+// Package authmiddleware provides HTTP middleware for session-based authentication.
 package authmiddleware
 
 import (
@@ -8,9 +8,8 @@ import (
 	authservice "kumacore/app/services/auth"
 )
 
-// LoadAuth validates the session cookie against the database and injects the
-// user into the request context if the session is valid and not expired.
-// Always calls next regardless of auth state (use RequireAuth to enforce auth).
+// LoadAuth validates the session cookie against the database and injects the user into the request context if the session
+// is valid and not expired. Always calls next regardless of auth state (use RequireAuth to enforce auth).
 func LoadAuth(authService *authservice.Service) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -39,7 +38,7 @@ func RequireAuth(authService *authservice.Service) func(http.Handler) http.Handl
 	return func(next http.Handler) http.Handler {
 		return load(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			if _, ok := authservice.AuthUser(request.Context()); !ok {
-				if request.Header.Get("HX-Request") == "true" {
+				if request.Header.Get("HX-Request-Type") == "partial" {
 					writer.Header().Set("HX-Redirect", "/")
 					writer.WriteHeader(http.StatusUnauthorized)
 					return

@@ -10,15 +10,16 @@
 
 	<link rel="stylesheet" href="/static/platform/base.css">
 
-	<meta name="htmx-config" content='{"refreshOnHistoryMiss":true}'>
+	<meta name="htmx-config" content='{
+		"includeIndicatorCSS": false
+	}'>
 
 	{{block "page-head" .}}{{end}}
 
 	<script src="/static/vendor/htmx.min.js"></script>
-	<script src="/static/platform/history.js"></script>
 </head>
 
-<body hx-boost="true" hx-target="#content">
+<body hx-boost:inherited="true" hx-target:inherited="#content">
 	<main id="content">
 		{{template "page-content" .}}
 	</main>

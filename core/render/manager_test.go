@@ -3,6 +3,7 @@ package render_test
 import (
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -59,6 +60,10 @@ func TestRenderDirectRequestRendersFullPage(t *testing.T) {
 	if !strings.Contains(body, "content:hello") {
 		t.Errorf("expected page content in body, got: %q", body)
 	}
+
+	if vary := recorder.Header().Values("Vary"); !slices.Contains(vary, "HX-Request-Type") {
+		t.Errorf("expected Vary to contain HX-Request-Type, got: %v", vary)
+	}
 }
 
 func TestRenderHTMXFragmentRendersFragmentOnly(t *testing.T) {
@@ -69,7 +74,7 @@ func TestRenderHTMXFragmentRendersFragmentOnly(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/", nil)
-	request.Header.Set("HX-Request", "true")
+	request.Header.Set("HX-Request-Type", "partial")
 
 	if err := manager.Render(
 		recorder,
@@ -89,6 +94,10 @@ func TestRenderHTMXFragmentRendersFragmentOnly(t *testing.T) {
 	if !strings.Contains(body, "content:hello") {
 		t.Errorf("expected fragment content in body, got: %q", body)
 	}
+
+	if vary := recorder.Header().Values("Vary"); !slices.Contains(vary, "HX-Request-Type") {
+		t.Errorf("expected Vary to contain HX-Request-Type, got: %v", vary)
+	}
 }
 
 func TestRenderHistoryRestoreRendersFullPage(t *testing.T) {
@@ -99,8 +108,8 @@ func TestRenderHistoryRestoreRendersFullPage(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/", nil)
-	request.Header.Set("HX-Request", "true")
-	request.Header.Set("HX-History-Restore-Request", "true")
+	// HX-Request-Type is intentionally absent: real direct-load and history-restore requests carry "full" or no htmx header
+	// at all. Only partial requests are fragments.
 
 	if err := manager.Render(
 		recorder,
@@ -130,7 +139,7 @@ func TestRender_HTMXBoosted_RendersFragmentOnly(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/", nil)
-	request.Header.Set("HX-Request", "true")
+	request.Header.Set("HX-Request-Type", "partial")
 	request.Header.Set("HX-Boosted", "true")
 
 	if err := manager.Render(

@@ -24,6 +24,7 @@ package render
 import (
 	"fmt"
 	"html/template"
+	"io"
 	"io/fs"
 	"net/http"
 	"sync"
@@ -89,11 +90,22 @@ func (templateManager *Manager) Render(
 		return err
 	}
 
-	if request.Header.Get("HX-History-Restore-Request") == "true" {
-		return pageTemplate.ExecuteTemplate(writer, "base", data)
-	}
+	writer.Header().Add("Vary", "HX-Request-Type")
 
-	if request.Header.Get("HX-Request") == "true" {
+	return templateManager.executeTemplate(writer, pageTemplate, request, fragment, data)
+}
+
+// executeTemplate picks the template name based on the same three-way dispatch used by Render: direct loads and history
+// restores (HTMX-Request-Type "full") execute "base". Partial HTMX requests (HX-Request-Type "partial") execute the
+// named fragment. The writer is any io.Writer so the same path can render into an HTTP response or an in-memory buffer.
+func (templateManager *Manager) executeTemplate(
+	writer io.Writer,
+	pageTemplate *template.Template,
+	request *http.Request,
+	fragment string,
+	data any,
+) error {
+	if request.Header.Get("HX-Request-Type") == "partial" {
 		return pageTemplate.ExecuteTemplate(writer, fragment, data)
 	}
 

@@ -30,9 +30,9 @@ Purpose:
 - Go template rendering with a HTMX behavior contract
 
 What it does:
-- direct requests render the full base page
-- `HX-Request: true` renders the requested fragment
-- history restore requests render a full page when required by runtime behavior
+- direct requests and history restores render the full base page
+- `HX-Request-Type: partial` renders the requested fragment
+- responses vary on `HX-Request-Type`
 - template parsing preserves clone-based page isolation
 - template paths are rooted at `app/`
 
