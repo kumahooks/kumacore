@@ -2,6 +2,8 @@ package initcmd
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -29,6 +31,63 @@ func renderReadmeModules(moduleIDs []string) string {
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+// renderAppEmbed builds app/embed.go for the selected modules.
+//
+// Every go:embed pattern must match at least one file. Modules without page templates, such as health, contribute no
+// pattern so a selection with no HTML pages still compiles.
+func renderAppEmbed(moduleIDs []string, projectName string) ([]byte, error) {
+	patterns := []string{
+		"web/templates/layouts/*.html",
+		"web/templates/components/*.html",
+	}
+
+	for _, moduleID := range normalizeModuleIDs(moduleIDs) {
+		hasPageTemplates, err := moduleHasPageTemplates(moduleID)
+		if err != nil {
+			return nil, err
+		}
+
+		if !hasPageTemplates {
+			continue
+		}
+
+		patterns = append(patterns, fmt.Sprintf("modules/%s/*.html", moduleID))
+	}
+
+	return []byte(fmt.Sprintf(`// Package app is the top-level application package for %s.
+package app
+
+import "embed"
+
+// Templates holds all templates baked into the binary at compile time: shared layouts, shared components, each module's
+// page templates, and per-module component fragments (modules/<name>/components/*.html).
+//
+//go:embed %s
+var Templates embed.FS
+`, projectName, strings.Join(patterns, " "))), nil
+}
+
+func moduleHasPageTemplates(moduleID string) (bool, error) {
+	moduleDirectory := filepath.Join("app", "modules", moduleID)
+
+	directoryEntries, err := os.ReadDir(moduleDirectory)
+	if err != nil {
+		return false, fmt.Errorf("[initcmd:moduleHasPageTemplates] read %s: %w", moduleDirectory, err)
+	}
+
+	for _, directoryEntry := range directoryEntries {
+		if directoryEntry.IsDir() {
+			continue
+		}
+
+		if strings.HasSuffix(directoryEntry.Name(), ".html") {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func renderJobImports(metadata RepoMetadata) string {
@@ -67,7 +126,8 @@ func renderModuleSetup(metadata RepoMetadata) string {
 		case "home":
 			setupLines = append(setupLines, `	homeHandler := home.NewHandler(renderer, configuration.App.Name)`)
 		case "auth":
-			setupLines = append(setupLines,
+			setupLines = append(
+				setupLines,
 				`	authRepository := authrepository.NewRepository(appDatabase)`,
 				`	userCache := cache.NewCache[string, authservice.CachedUser](configuration.Core.Session.CacheTTL)`,
 				`	authService, err := authservice.NewService(authRepository, configuration.Core.Session.TTL, userCache)`,

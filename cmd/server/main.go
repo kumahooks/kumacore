@@ -1,11 +1,13 @@
-// Package main starts kumacore.
 package main
 
 import (
 	"context"
+	"io/fs"
 	"log"
 	"os"
+	"path/filepath"
 
+	kumacoreapp "kumacore/app"
 	"kumacore/core/app"
 	"kumacore/core/config"
 	"kumacore/core/render"
@@ -21,7 +23,12 @@ func main() {
 		log.Fatalf("[server:main] create backup directory: %v", err)
 	}
 
-	fileSystem := os.DirFS(configuration.App.RootDir)
+	var fileSystem fs.FS
+	if configuration.Core.App.Dev {
+		fileSystem = os.DirFS(filepath.Join(configuration.App.RootDir, "app"))
+	} else {
+		fileSystem = kumacoreapp.Templates
+	}
 
 	renderer, err := render.NewManager(configuration.Core.App.Dev, fileSystem)
 	if err != nil {
@@ -51,6 +58,7 @@ func main() {
 		Routes:          modules.routes,
 		Jobs:            workerRuntime.jobs,
 		FileSystem:      fileSystem,
+		StaticDir:       configuration.App.Static.Dir,
 		MigrationSource: newAppMigrationSource(),
 		Renderer:        renderer,
 	}

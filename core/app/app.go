@@ -1,6 +1,4 @@
-// Package app provides the core HTTP application lifecycle using Chi router.
-// It handles server initialization, route registration, static file serving,
-// migration execution, and graceful shutdown.
+// Package app provides the core application lifecycle: initialization, migration, route wiring, and graceful shutdown.
 package app
 
 import (
@@ -24,8 +22,12 @@ import (
 )
 
 const (
-	staticDirectory           = "app/web/static"
-	defaultMigrationDirectory = "app/migrations/sqlite/app"
+	// appRootDirectory is the template filesystem root, relative to APP_ROOT_DIR.
+	appRootDirectory = "app"
+	// defaultStaticDirectory is disk-relative to APP_ROOT_DIR.
+	defaultStaticDirectory = "app/web/static"
+	// defaultMigrationDirectory is relative to the template filesystem root.
+	defaultMigrationDirectory = "migrations/sqlite/app"
 )
 
 type WorkerRuntime interface {
@@ -36,9 +38,9 @@ type WorkerRuntime interface {
 }
 
 type Options struct {
-	Configuration   *config.Config
-	Database        *sql.DB
-	Dialect         dialect.Dialect
+	Configuration *config.Config
+	Database      *sql.DB
+	Dialect       dialect.Dialect
 	// Caller must not mutate these slices after passing to New.
 	Middleware      []func(http.Handler) http.Handler
 	Routes          []httpx.RouteRegistrar
@@ -79,12 +81,12 @@ func New(options Options) (*App, error) {
 
 	fileSystem := options.FileSystem
 	if fileSystem == nil {
-		fileSystem = os.DirFS(options.Configuration.App.RootDir)
+		fileSystem = os.DirFS(filepath.Join(options.Configuration.App.RootDir, appRootDirectory))
 	}
 
 	staticDir := options.StaticDir
 	if staticDir == "" {
-		staticDir = filepath.Join(options.Configuration.App.RootDir, staticDirectory)
+		staticDir = filepath.Join(options.Configuration.App.RootDir, defaultStaticDirectory)
 	}
 
 	options.FileSystem = fileSystem

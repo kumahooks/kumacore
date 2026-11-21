@@ -1,4 +1,4 @@
-// Package home is a simple home page example.
+// Package home implements the home page handler.
 package home
 
 import (
@@ -24,13 +24,14 @@ func NewHandler(renderer render.Renderer, applicationName string) *Handler {
 // Routes registers the home page route on the given router.
 func Routes(handler *Handler) func(chi.Router) {
 	return func(router chi.Router) {
+		// Public
 		router.Get("/", handler.Index)
 	}
 }
 
 // Index renders the home page.
 func (handler *Handler) Index(writer http.ResponseWriter, request *http.Request) {
-	pageFile := "app/modules/home/home.html"
+	pageFile := "modules/home/home.html"
 	data := map[string]any{
 		"Title":           handler.applicationName,
 		"ApplicationName": handler.applicationName,

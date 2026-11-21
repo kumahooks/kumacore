@@ -151,11 +151,11 @@ func TestInitialize_MigrationFailureClosesDatabase(t *testing.T) {
 		MigrationSource: migrate.Source{
 			Backend: "sqlite",
 			FileSystem: fstest.MapFS{
-				"app/migrations/sqlite/app/0002_create_widgets.sql": &fstest.MapFile{
+				"migrations/sqlite/app/0002_create_widgets.sql": &fstest.MapFile{
 					Data: []byte("CREATE TABLE widgets (id INTEGER PRIMARY KEY);"),
 				},
 			},
-			Directory: "app/migrations/sqlite/app",
+			Directory: "migrations/sqlite/app",
 		},
 	})
 	if err != nil {
@@ -302,6 +302,58 @@ func TestInitialize_WorkerRegisterFailureClosesDatabase(t *testing.T) {
 	}
 }
 
+func TestInitialize_DefaultFileSystemRootsAtAppDirectory(t *testing.T) {
+	rootDirectory := t.TempDir()
+	appDirectory := filepath.Join(rootDirectory, "app")
+
+	writeTestFile(
+		t,
+		filepath.Join(appDirectory, "web/templates/layouts/base.html"),
+		`{{define "base"}}{{template "page-content" .}}{{end}}`,
+	)
+	writeTestFile(
+		t,
+		filepath.Join(appDirectory, "web/templates/components/navbar.html"),
+		`{{define "navbar"}}{{end}}`,
+	)
+	writeTestFile(
+		t,
+		filepath.Join(appDirectory, "migrations/sqlite/app/0001_create_widgets.sql"),
+		`CREATE TABLE widgets (id INTEGER PRIMARY KEY);`,
+	)
+
+	configuration := testConfiguration(t)
+	configuration.App.RootDir = rootDirectory
+
+	database, databaseDialect := testDatabase(t)
+
+	application, err := New(Options{
+		Configuration: configuration,
+		Database:      database,
+		Dialect:       databaseDialect,
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(application.close)
+
+	if err := application.Initialize(context.Background()); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+}
+
+func writeTestFile(t *testing.T, path string, contents string) {
+	t.Helper()
+
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("MkdirAll %s: %v", path, err)
+	}
+
+	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+		t.Fatalf("WriteFile %s: %v", path, err)
+	}
+}
+
 func testConfiguration(t *testing.T) *config.Config {
 	t.Helper()
 	t.Cleanup(func() {
@@ -333,13 +385,13 @@ func testDatabase(t *testing.T) (*sql.DB, dialect.Dialect) {
 
 func testFileSystem() fstest.MapFS {
 	return fstest.MapFS{
-		"app/web/templates/layouts/base.html": &fstest.MapFile{
+		"web/templates/layouts/base.html": &fstest.MapFile{
 			Data: []byte(`{{define "base"}}{{template "page-content" .}}{{end}}`),
 		},
-		"app/web/templates/components/navbar.html": &fstest.MapFile{
+		"web/templates/components/navbar.html": &fstest.MapFile{
 			Data: []byte(`{{define "navbar"}}{{end}}`),
 		},
-		"app/migrations/sqlite/app/0001_create_widgets.sql": &fstest.MapFile{
+		"migrations/sqlite/app/0001_create_widgets.sql": &fstest.MapFile{
 			Data: []byte(`CREATE TABLE widgets (id INTEGER PRIMARY KEY);`),
 		},
 	}
@@ -349,6 +401,6 @@ func testMigrationSource(fileSystem fstest.MapFS) migrate.Source {
 	return migrate.Source{
 		Backend:    "sqlite",
 		FileSystem: fileSystem,
-		Directory:  "app/migrations/sqlite/app",
+		Directory:  "migrations/sqlite/app",
 	}
 }

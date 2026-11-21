@@ -127,6 +127,79 @@ func TestRenderGoMod_RewritesModulePath(t *testing.T) {
 	}
 }
 
+func TestRenderAppEmbed_MatchesRepositoryBaseline(t *testing.T) {
+	t.Chdir(repoRoot(t))
+
+	rendered, err := renderAppEmbed([]string{"home", "auth", "health"}, "kumacore")
+	if err != nil {
+		t.Fatalf("renderAppEmbed: %v", err)
+	}
+
+	baseline, err := os.ReadFile(appEmbedPath)
+	if err != nil {
+		t.Fatalf("ReadFile %s: %v", appEmbedPath, err)
+	}
+
+	if string(rendered) != string(baseline) {
+		t.Fatalf(
+			"renderAppEmbed output differs from %s:\n--- rendered ---\n%s\n--- baseline ---\n%s",
+			appEmbedPath,
+			rendered,
+			baseline,
+		)
+	}
+}
+
+func TestRenderAppEmbed_OmitsModulesWithoutPageTemplates(t *testing.T) {
+	t.Chdir(repoRoot(t))
+
+	rendered, err := renderAppEmbed([]string{"health"}, "kumacore")
+	if err != nil {
+		t.Fatalf("renderAppEmbed: %v", err)
+	}
+
+	source := string(rendered)
+	for _, line := range strings.Split(source, "\n") {
+		if strings.HasPrefix(line, "//go:embed") && strings.Contains(line, "modules/") {
+			t.Fatalf("renderAppEmbed emitted a module pattern without page templates:\n%s", source)
+		}
+	}
+
+	for _, requiredPattern := range []string{
+		"web/templates/layouts/*.html",
+		"web/templates/components/*.html",
+	} {
+		if !strings.Contains(source, requiredPattern) {
+			t.Fatalf("renderAppEmbed missing pattern %q:\n%s", requiredPattern, source)
+		}
+	}
+}
+
+func TestPlannedChanges_IncludesAppEmbed(t *testing.T) {
+	t.Chdir(repoRoot(t))
+
+	changes, err := plannedChanges(Options{ProjectName: "myapp", Modules: []string{"home"}})
+	if err != nil {
+		t.Fatalf("plannedChanges: %v", err)
+	}
+
+	var appEmbedChange *fileChange
+	for index := range changes {
+		if changes[index].path == appEmbedPath {
+			appEmbedChange = &changes[index]
+			break
+		}
+	}
+
+	if appEmbedChange == nil {
+		t.Fatalf("plannedChanges missing %s", appEmbedPath)
+	}
+
+	if !strings.Contains(string(appEmbedChange.data), "modules/home/*.html") {
+		t.Fatalf("plannedChanges %s missing home module pattern:\n%s", appEmbedPath, appEmbedChange.data)
+	}
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 

@@ -1,4 +1,4 @@
-// Package config handles core and app configuration via environment variables.
+// Package config handles application configuration via environment variables.
 package config
 
 import (
@@ -11,7 +11,7 @@ import (
 
 const sqliteDriver = "sqlite"
 
-// Config holds core and application configuration populated from environment variables.
+// Config holds all application configuration populated from environment variables.
 type Config struct {
 	Core CoreConfig
 	App  AppConfig
@@ -58,6 +58,10 @@ type CoreConfig struct {
 type AppConfig struct {
 	Name    string `envconfig:"APP_NAME"     default:"kumacore"`
 	RootDir string `envconfig:"APP_ROOT_DIR" default:"."`
+
+	Static struct {
+		Dir string `envconfig:"APP_STATIC_DIR" default:"./app/web/static"`
+	}
 }
 
 // Load reads environment variables into a Config using envconfig.
@@ -128,6 +132,10 @@ func (configuration Config) Validate() error {
 
 	if strings.TrimSpace(configuration.App.RootDir) == "" {
 		return fmt.Errorf("[config:Validate] APP_ROOT_DIR is required")
+	}
+
+	if strings.TrimSpace(configuration.App.Static.Dir) == "" {
+		return fmt.Errorf("[config:Validate] APP_STATIC_DIR is required")
 	}
 
 	return nil

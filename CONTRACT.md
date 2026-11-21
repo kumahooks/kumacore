@@ -34,7 +34,7 @@ What it does:
 - `HX-Request: true` renders the requested fragment
 - history restore requests render a full page when required by runtime behavior
 - template parsing preserves clone-based page isolation
-- dev mode bypasses page cache and production mode caches parsed pages
+- template paths are rooted at `app/`
 
 ### `core/db` seams
 
@@ -77,6 +77,7 @@ Purpose:
 
 What it does:
 - selected HTTP-facing modules are copied into the generated app under `app/modules/`
+- `app/embed.go` is generated with embed patterns for the selected modules that contain page templates
 - copied implementation files are app-owned source after generation
 - generated bootstrap wiring is explicit
 - runtime behavior does not depend on module directory scanning or hidden autoloading

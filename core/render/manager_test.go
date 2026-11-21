@@ -11,16 +11,16 @@ import (
 )
 
 var testFS = fstest.MapFS{
-	"app/web/templates/layouts/base.html": {
+	"web/templates/layouts/base.html": {
 		Data: []byte(`{{define "base"}}base:{{template "page-content" .}}{{end}}`),
 	},
-	"app/web/templates/components/navbar.html": {
+	"web/templates/components/navbar.html": {
 		Data: []byte(`{{define "navbar"}}{{end}}`),
 	},
-	"app/modules/page/page.html": {
+	"modules/page/page.html": {
 		Data: []byte(`{{define "page-content"}}content:{{.Title}}{{end}}`),
 	},
-	"app/modules/other/other.html": {
+	"modules/other/other.html": {
 		Data: []byte(`{{define "page-content"}}other:{{.Title}}{{end}}`),
 	},
 }
@@ -44,7 +44,7 @@ func TestRenderDirectRequestRendersFullPage(t *testing.T) {
 	if err := manager.Render(
 		recorder,
 		request,
-		"app/modules/page/page.html",
+		"modules/page/page.html",
 		"page-content",
 		map[string]any{"Title": "hello"},
 	); err != nil {
@@ -74,7 +74,7 @@ func TestRenderHTMXFragmentRendersFragmentOnly(t *testing.T) {
 	if err := manager.Render(
 		recorder,
 		request,
-		"app/modules/page/page.html",
+		"modules/page/page.html",
 		"page-content",
 		map[string]any{"Title": "hello"},
 	); err != nil {
@@ -105,7 +105,7 @@ func TestRenderHistoryRestoreRendersFullPage(t *testing.T) {
 	if err := manager.Render(
 		recorder,
 		request,
-		"app/modules/page/page.html",
+		"modules/page/page.html",
 		"page-content",
 		map[string]any{"Title": "restore"},
 	); err != nil {
@@ -136,7 +136,7 @@ func TestRender_HTMXBoosted_RendersFragmentOnly(t *testing.T) {
 	if err := manager.Render(
 		recorder,
 		request,
-		"app/modules/page/page.html",
+		"modules/page/page.html",
 		"page-content",
 		map[string]any{"Title": "hello"},
 	); err != nil {
@@ -162,7 +162,7 @@ func TestRenderMissingPageFileReturnsError(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/", nil)
 
-	err = manager.Render(recorder, request, "app/modules/missing/missing.html", "page-content", nil)
+	err = manager.Render(recorder, request, "modules/missing/missing.html", "page-content", nil)
 	if err == nil {
 		t.Fatal("expected error for missing page file")
 	}
@@ -178,7 +178,7 @@ func TestRenderCloneIsolationPagesDoNotCollide(t *testing.T) {
 	if err := manager.Render(
 		recorderA,
 		httptest.NewRequest(http.MethodGet, "/", nil),
-		"app/modules/page/page.html",
+		"modules/page/page.html",
 		"page-content",
 		map[string]any{"Title": "alpha"},
 	); err != nil {
@@ -189,7 +189,7 @@ func TestRenderCloneIsolationPagesDoNotCollide(t *testing.T) {
 	if err := manager.Render(
 		recorderB,
 		httptest.NewRequest(http.MethodGet, "/", nil),
-		"app/modules/other/other.html",
+		"modules/other/other.html",
 		"page-content",
 		map[string]any{"Title": "beta"},
 	); err != nil {
@@ -218,7 +218,7 @@ func TestRenderDevModeRendersCorrectly(t *testing.T) {
 	if err := manager.Render(
 		recorder,
 		request,
-		"app/modules/page/page.html",
+		"modules/page/page.html",
 		"page-content",
 		map[string]any{"Title": "devmode"},
 	); err != nil {

@@ -1,9 +1,24 @@
-// Package render manages HTML template parsing and HTMX-aware rendering.
+// Package render manages HTML template parsing and rendering.
 //
-// In production, templates are served from the filesystem passed by generated
-// app bootstrap and page templates are cached.
-// In dev mode, templates are read from disk on every request so file changes
-// are picked up without restarting.
+// In production (dev=false), templates are parsed once at startup and cached for the lifetime of the process. Page
+// templates are cloned from the shared base set on first use to prevent naming collisions. In dev mode (dev=true),
+// templates are re-parsed from disk on every request so file changes are picked up without restarting.
+//
+// The caller provides an fs.FS that backs all template reads. It is the caller's responsibility to choose between an
+// embedded FS (binary-baked in production) and a disk-backed FS (os.DirFS in dev).
+//
+// Template layers, parsed in order:
+//   - layouts: shared full-page shells (web/templates/layouts/*.html)
+//   - components: shared cross-module fragments (web/templates/components/*.html)
+//   - module components: per-module fragments (modules/<name>/components/*.html),
+//     derived from the directory of the page file. Modules without a components
+//     directory are unaffected. Module component files must not define
+//     "page-content". That block belongs to the page file.
+//   - page file: the single file passed to Render, defining "page-content" and
+//     any module-specific blocks.
+//
+// All layers share one flat template namespace within a parsed set. Define names must be unique within the combined set
+// of a single build.
 package render
 
 import (
@@ -15,8 +30,8 @@ import (
 )
 
 const (
-	layoutsPattern    = "app/web/templates/layouts/*.html"
-	componentsPattern = "app/web/templates/components/*.html"
+	layoutsPattern    = "web/templates/layouts/*.html"
+	componentsPattern = "web/templates/components/*.html"
 )
 
 // Renderer is the interface handlers use to execute page templates.
@@ -24,8 +39,7 @@ type Renderer interface {
 	Render(writer http.ResponseWriter, request *http.Request, pageFile string, fragment string, data any) error
 }
 
-// Manager holds the base template set, layouts and components, and an fs.FS
-// pointing to the generated app root.
+// Manager holds the base template set, layouts and components, and an fs.FS pointing to the app root.
 // prod: generated app filesystem with page cache
 // dev: generated app filesystem without page cache
 type Manager struct {
@@ -36,9 +50,8 @@ type Manager struct {
 	isDevelopment  bool
 }
 
-// NewManager parses the shared base templates, layouts and components, from fileSystem
-// and returns a Manager ready to render pages. isDevelopment disables the page cache
-// so templates are re-parsed from disk on every request.
+// NewManager parses the shared base templates, layouts and components, from fileSystem and returns a Manager ready to
+// render pages. isDevelopment disables the page cache so templates are re-parsed from disk on every request.
 func NewManager(isDevelopment bool, fileSystem fs.FS) (*Manager, error) {
 	baseTemplate := template.New("")
 
@@ -58,12 +71,12 @@ func NewManager(isDevelopment bool, fileSystem fs.FS) (*Manager, error) {
 	}, nil
 }
 
-// Render executes the page template against the request, returning either a
-// full page or a fragment depending on HTMX headers.
+// Render executes the page template against the request, returning either a full page or a fragment depending on the
+// HX-Request-Type header (htmx 4).
 //
-// fragment is the template name executed for HTMX requests. Full page requests
-// always execute "base". Standard page handlers pass "page-content";
-// fine-grained fragment endpoints pass the specific named define they want to render.
+// fragment is the template name executed for partial HTMX requests (HX-Request-Type "partial"). Full page requests
+// always execute "base". Standard page handlers pass "page-content". Fine-grained fragment endpoints pass the specific
+// named define they want to render.
 func (templateManager *Manager) Render(
 	writer http.ResponseWriter,
 	request *http.Request,
@@ -94,33 +107,34 @@ func (templateManager *Manager) resolve(pageFile string) (*template.Template, er
 	}
 
 	templateManager.pageCacheMutex.RLock()
-	cached, ok := templateManager.pageCache[pageFile]
+	cachedTemplate, ok := templateManager.pageCache[pageFile]
 	templateManager.pageCacheMutex.RUnlock()
 	if ok {
-		return cached, nil
+		return cachedTemplate, nil
 	}
 
 	templateManager.pageCacheMutex.Lock()
 	defer templateManager.pageCacheMutex.Unlock()
 
-	if cached, ok = templateManager.pageCache[pageFile]; ok {
-		return cached, nil
+	if cachedTemplate, ok = templateManager.pageCache[pageFile]; ok {
+		return cachedTemplate, nil
 	}
 
-	built, err := templateManager.build(pageFile)
+	builtTemplate, err := templateManager.build(pageFile)
 	if err != nil {
 		return nil, err
 	}
 
-	templateManager.pageCache[pageFile] = built
-	return built, nil
+	templateManager.pageCache[pageFile] = builtTemplate
+
+	return builtTemplate, nil
 }
 
 // build constructs a complete template set for pageFile.
 //
-// In dev mode all three layers, layouts, components, and page, are parsed fresh
-// from disk on every call so any HTML change is picked up without a restart.
-// In production the pre-parsed base is cloned and only the page file is parsed.
+// In dev mode all three layers, layouts, components, and page, are parsed fresh from disk on every call so any HTML
+// change is picked up without a restart. In production the pre-parsed base is cloned and only the page file is parsed
+// into the clone.
 func (templateManager *Manager) build(pageFile string) (*template.Template, error) {
 	if templateManager.isDevelopment {
 		freshTemplate := template.New("")

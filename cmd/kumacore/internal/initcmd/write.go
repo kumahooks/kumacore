@@ -20,6 +20,7 @@ const (
 	goSumPath          = "go.sum"
 	gitIgnorePath      = ".gitignore"
 	readmePath         = "README.md"
+	appEmbedPath       = "app/embed.go"
 	appGitKeepPath     = "app/migrations/sqlite/app/.gitkeep"
 )
 
@@ -105,6 +106,11 @@ func plannedChanges(options Options) ([]fileChange, error) {
 
 	renderedReadme := []byte(renderReadme(options))
 	renderedGitIgnore := []byte(renderGitIgnore())
+	renderedAppEmbed, err := renderAppEmbed(options.Modules, options.ProjectName)
+	if err != nil {
+		return nil, err
+	}
+
 	rewrittenGoMod, err := renderGoMod(options.ProjectName)
 	if err != nil {
 		return nil, err
@@ -120,6 +126,7 @@ func plannedChanges(options Options) ([]fileChange, error) {
 		fileChange{path: goSumPath, reason: "write project file", data: goSumBytes},
 		fileChange{path: gitIgnorePath, reason: "write project file", data: renderedGitIgnore},
 		fileChange{path: readmePath, reason: "write project file", data: renderedReadme},
+		fileChange{path: appEmbedPath, reason: "write project file", data: renderedAppEmbed},
 		fileChange{path: serverMainPath, reason: "write project file", data: renderedServerMain},
 		fileChange{path: serverDatabasePath, reason: "copy scaffold file", data: renderedServerDatabase},
 		fileChange{path: serverModulesPath, reason: "write generated wiring", data: rewrittenModules},

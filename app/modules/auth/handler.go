@@ -123,7 +123,7 @@ func (handler *Handler) Logout(writer http.ResponseWriter, request *http.Request
 func (handler *Handler) Me(writer http.ResponseWriter, request *http.Request) {
 	user, _ := authservice.AuthUser(request.Context())
 
-	pageFile := "app/modules/auth/me.html"
+	pageFile := "modules/auth/me.html"
 	data := map[string]any{"Title": "auth/me", "User": user}
 
 	if err := handler.renderer.Render(writer, request, pageFile, "page-content", data); err != nil {
@@ -133,7 +133,7 @@ func (handler *Handler) Me(writer http.ResponseWriter, request *http.Request) {
 }
 
 func (handler *Handler) renderLogin(writer http.ResponseWriter, request *http.Request, errorMessage string) {
-	pageFile := "app/modules/auth/auth.html"
+	pageFile := "modules/auth/auth.html"
 	data := map[string]any{"Title": "auth"}
 
 	if errorMessage != "" {
