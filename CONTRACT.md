@@ -50,6 +50,7 @@ What it does:
 - `ServeUserFile` streams a user-supplied file with the shared inline policy, sets `Content-Security-Policy: default-src 'none'; sandbox`, and writes a formatted `Content-Disposition`
 - a stored content type is honored only when `media.IsInlineContentType` allows it; otherwise the response is forced to `application/octet-stream`
 - `UserFile.Attachment` forces a download even when the content type is safe inline
+- `ParsePaginationPage` parses a 1-based page number from a raw query value and clamps empty, non-numeric, sub-one, and overflowing values to 1
 
 ### `core/log`
 

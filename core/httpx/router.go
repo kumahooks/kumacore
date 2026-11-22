@@ -44,6 +44,23 @@ func RegisterRoutes(router chi.Router, registrars ...RouteRegistrar) {
 	}
 }
 
+// ParsePaginationPage parses a 1-based page number from a raw query string value. Empty, non-numeric, sub-one, or overflowing
+// values clamp to 1, so a missing or malformed ?page= parameter always resolves to the first page. Callers pass
+// request.URL.Query().Get("page") so the primitive stays free of url.Values coupling and reusable for any paginated
+// query parameter.
+func ParsePaginationPage(rawPage string) int {
+	if rawPage == "" {
+		return 1
+	}
+
+	page, err := strconv.Atoi(rawPage)
+	if err != nil || page < 1 {
+		return 1
+	}
+
+	return page
+}
+
 // RegisterStatic mounts static files and conventional metadata files.
 func RegisterStatic(router chi.Router, staticDir string) {
 	staticFileHandler := newStaticFileHandler(staticDir)
