@@ -5,12 +5,12 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 
 	"kumacore/app/middleware/auth"
 	"kumacore/app/services/auth"
+	"kumacore/core/httpx"
 	"kumacore/core/render"
 )
 
@@ -83,15 +83,7 @@ func (handler *Handler) Authenticate(writer http.ResponseWriter, request *http.R
 		return
 	}
 
-	http.SetCookie(writer, &http.Cookie{
-		Name:     "session",
-		Value:    rawToken,
-		Path:     "/",
-		Expires:  expiresAt,
-		HttpOnly: true,
-		Secure:   handler.secureCookie,
-		SameSite: http.SameSiteStrictMode,
-	})
+	httpx.SetCookie(writer, "session", rawToken, expiresAt, handler.secureCookie)
 
 	http.Redirect(writer, request, "/auth/me", http.StatusSeeOther)
 }
@@ -105,16 +97,7 @@ func (handler *Handler) Logout(writer http.ResponseWriter, request *http.Request
 		}
 	}
 
-	http.SetCookie(writer, &http.Cookie{
-		Name:     "session",
-		Value:    "",
-		Path:     "/",
-		Expires:  time.Unix(0, 0),
-		MaxAge:   -1,
-		HttpOnly: true,
-		Secure:   handler.secureCookie,
-		SameSite: http.SameSiteStrictMode,
-	})
+	httpx.ClearCookie(writer, "session", handler.secureCookie)
 
 	http.Redirect(writer, request, "/", http.StatusSeeOther)
 }

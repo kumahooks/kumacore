@@ -14,7 +14,9 @@ func (application *App) newRouter(appMiddlewares []func(http.Handler) http.Handl
 	middlewares := []func(http.Handler) http.Handler{
 		chiMiddleware.Logger,
 		chiMiddleware.Recoverer,
+		httpx.LimitRequestBody(application.options.Configuration.Core.Server.MaxBodyBytes),
 		security.Middleware,
+		security.SameOriginMiddleware,
 	}
 
 	middlewares = append(middlewares, appMiddlewares...)

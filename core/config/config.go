@@ -20,8 +20,9 @@ type Config struct {
 // CoreConfig holds stable kumacore runtime configuration.
 type CoreConfig struct {
 	Server struct {
-		Host string `envconfig:"CORE_SERVER_HOST" default:"127.0.0.1"`
-		Port int    `envconfig:"CORE_SERVER_PORT" default:"3000"`
+		Host         string `envconfig:"CORE_SERVER_HOST" default:"127.0.0.1"`
+		Port         int    `envconfig:"CORE_SERVER_PORT" default:"3000"`
+		MaxBodyBytes int64  `envconfig:"CORE_SERVER_MAX_BODY_BYTES" default:"67108864"`
 	}
 
 	App struct {
@@ -86,6 +87,10 @@ func (configuration Config) Validate() error {
 
 	if configuration.Core.Server.Port < 1 || configuration.Core.Server.Port > 65535 {
 		return fmt.Errorf("[config:Validate] CORE_SERVER_PORT must be between 1 and 65535")
+	}
+
+	if configuration.Core.Server.MaxBodyBytes <= 0 {
+		return fmt.Errorf("[config:Validate] CORE_SERVER_MAX_BODY_BYTES must be positive")
 	}
 
 	if configuration.Core.DB.Driver != sqliteDriver {

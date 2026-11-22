@@ -86,6 +86,7 @@ func (application *App) Start(addr string) error {
 		Addr:              addr,
 		Handler:           application.runtime.router,
 		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       5 * time.Minute,
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}

@@ -14,6 +14,7 @@ What it does:
 - initialization aborts on any startup failure
 - static registration, route registration, migration execution, and optional worker startup are explicit lifecycle steps
 - graceful shutdown closes runtime resources explicitly
+- the HTTP server sets a 5-minute read timeout alongside header, write, and idle timeouts
 
 ### `core/config`
 
@@ -22,7 +23,28 @@ Purpose:
 
 What it does:
 - runtime config domain for server, app mode, database, logs, sessions, and worker settings
+- `CORE_SERVER_MAX_BODY_BYTES` defaults to 64 MiB and must be positive
 - invalid critical runtime configuration fails startup early
+
+### `core/security`
+
+Purpose:
+- baseline HTTP security headers and same-origin enforcement
+
+What it does:
+- every response sets `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, a restrictive `Content-Security-Policy`, and `Permissions-Policy`
+- `SameOriginMiddleware` rejects unsafe methods with a mismatched `Origin` or `Referer` host, or `Sec-Fetch-Site: cross-site`, with status 400
+- only the request `Host` is accepted, while `X-Forwarded-Host` is ignored
+
+### `core/httpx`
+
+Purpose:
+- request and cookie helpers shared by app code
+
+What it does:
+- `LimitRequestBody` caps request body reads with `http.MaxBytesReader`. Non-positive limits disable the cap
+- `SetCookie` and `ClearCookie` write session cookies with Path `/`, HttpOnly, caller-selected Secure, and SameSite Strict
+- `ClearCookie` expires the cookie with MaxAge -1
 
 ### `core/render`
 
@@ -35,7 +57,7 @@ What it does:
 - responses vary on `HX-Request-Type`
 - `RenderError` renders the configured error template as a full page with the requested status
 - partial HTMX errors respond with `HX-Redirect` and an empty body so the client re-enters as a direct load
-- production validates the error template at startup; dev re-reads it per request
+- production validates the error template at startup, while dev re-reads it per request
 - template parsing preserves clone-based page isolation
 - module-local components under `modules/<name>/components/*.html` are parsed with their page
 - duplicate define names across module component files abort the build

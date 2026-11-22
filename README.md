@@ -49,7 +49,7 @@ Startup is deterministic:
 3. open the SQLite adapter
 4. construct repositories, services, middleware, handlers, and jobs explicitly
 5. validate and run migrations
-6. build the HTTP stack
+6. build the HTTP stack, including the request body cap, security headers, and same-origin checks
 7. register app worker jobs when worker runtime is enabled
 8. start the optional worker runtime
 9. start the server

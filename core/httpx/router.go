@@ -1,4 +1,4 @@
-// Package httpx provides the core HTTP router contracts and wiring helpers.
+// Package httpx provides HTTP primitives: chi-based routing, hardened cookie writes, static file serving, and request helpers.
 package httpx
 
 import (
@@ -23,12 +23,10 @@ type Router interface {
 	Use(middlewares ...func(http.Handler) http.Handler)
 }
 
-// RouteRegistrar is a function that registers routes on a chi.Router.
-// Each module exposes a Routes function returning this type so that
-// route paths are owned by the module rather than the central wiring layer.
+// RouteRegistrar is a function that registers routes on a chi.Router. Each module exposes a Routes function returning
+// this type so that route paths are owned by the module rather than the central wiring layer.
 //
-// Type alias, not a new type, so callers can return func(chi.Router)
-// without importing this package.
+// Type alias, not a new type, so callers can return func(chi.Router) without importing this package.
 type RouteRegistrar = func(chi.Router)
 
 // NewRouter creates a Chi router and applies global middleware.
@@ -39,8 +37,7 @@ func NewRouter(middlewares ...func(http.Handler) http.Handler) *chi.Mux {
 	return router
 }
 
-// RegisterRoutes delegates all page routes to the provided registrars.
-// Each module registers its own paths via Routes.
+// RegisterRoutes delegates all page routes to the provided registrars. Each module registers its own paths via Routes.
 func RegisterRoutes(router chi.Router, registrars ...RouteRegistrar) {
 	for _, register := range registrars {
 		register(router)
@@ -123,8 +120,7 @@ func calculateStaticEntityTag(fileInfo os.FileInfo) string {
 	return entityTagBuilder.String()
 }
 
-// fileOnlyFS wraps http.FileSystem and rejects directory requests,
-// preventing directory listing on the static file server.
+// fileOnlyFS wraps http.FileSystem and rejects directory requests, preventing directory listing on the static file server.
 type fileOnlyFS struct {
 	fileSystem http.FileSystem
 }
