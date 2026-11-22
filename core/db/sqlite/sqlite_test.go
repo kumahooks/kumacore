@@ -59,6 +59,23 @@ func TestOpen_ForeignKeysEnabled(t *testing.T) {
 	}
 }
 
+func TestOpen_BusyTimeoutConfigured(t *testing.T) {
+	database, err := sqlite.Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer database.Close()
+
+	var busyTimeout int
+	if err := database.QueryRow("PRAGMA busy_timeout").Scan(&busyTimeout); err != nil {
+		t.Fatalf("PRAGMA busy_timeout: %v", err)
+	}
+
+	if busyTimeout != 5000 {
+		t.Errorf("busy_timeout: got %d, want %d", busyTimeout, 5000)
+	}
+}
+
 func TestOpen_MemoryDatabase_UsesSingleConnection(t *testing.T) {
 	database, err := sqlite.Open(":memory:")
 	if err != nil {

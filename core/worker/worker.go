@@ -1,4 +1,6 @@
-// Package worker provides a simple background job runner.
+// Package worker provides a simple background job runner. Scheduled jobs (Interval > 0) first run one Interval after
+// Start, then repeat at their interval. On-demand jobs (Interval == 0) are enqueued to the DB queue via Enqueue and
+// executed by the poll loop, with automatic retry and graveyard on repeated failure.
 package worker
 
 import (
@@ -8,22 +10,33 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"sync"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 
 	"kumacore/core/db/dialect"
 	"kumacore/core/db/migrate"
 )
 
-// Job is a named background task.
-// Interval = 0 is for on-demand jobs enqueued to the worker database.
+// Job describes a unit of work the Runtime can execute.
+// If Interval > 0 the job runs on a timer; if Interval == 0 it must be enqueued via Runtime.Enqueue and is executed
+// by the poll loop.
 type Job struct {
 	Name     string
 	Interval time.Duration
 	Run      func(ctx context.Context, payload any) error
 }
 
-// Runtime holds worker jobs, the queue database, and runner settings.
+// Stats is a snapshot of the background queue stats.
+type Stats struct {
+	Pending         int
+	Running         int
+	Buried          int
+	History         int
+	OldestPendingAt int64
+}
+
+// Runtime manages a pool of background jobs and a queue-based execution loop.
 type Runtime struct {
 	database        *sql.DB
 	dialect         dialect.Dialect
@@ -34,10 +47,11 @@ type Runtime struct {
 	jobMap          map[string]Job
 	queue           *jobQueue
 	cancel          context.CancelFunc
-	wg              sync.WaitGroup
+	wg              *errgroup.Group
 }
 
-// NewRuntime creates a worker runtime backed by a dedicated worker database.
+// NewRuntime creates a Runtime that polls the queue on the given interval and retries failed jobs up to maxAttempts
+// times before burying them.
 func NewRuntime(
 	database *sql.DB,
 	databaseDialect dialect.Dialect,
@@ -72,7 +86,7 @@ func NewRuntime(
 	}, nil
 }
 
-// Initialize validates and applies worker database migrations.
+// Initialize validates and applies pending database migrations.
 func (runtime *Runtime) Initialize(ctx context.Context) error {
 	plan, err := migrate.Validate(ctx, runtime.database, runtime.dialect, runtime.migrationSource)
 	if err != nil {
@@ -82,7 +96,7 @@ func (runtime *Runtime) Initialize(ctx context.Context) error {
 	return migrate.ApplyPlan(ctx, runtime.database, plan)
 }
 
-// Register appends one or more jobs to the runtime.
+// Register adds jobs to the runtime. Each job name must be unique.
 func (runtime *Runtime) Register(jobs ...Job) error {
 	for _, job := range jobs {
 		jobName := strings.TrimSpace(job.Name)
@@ -113,9 +127,10 @@ func (runtime *Runtime) Register(jobs ...Job) error {
 	return nil
 }
 
-// Start spawns scheduled jobs and starts the queue poll loop.
+// Start launches timer-based jobs and begins polling the queue.
 func (runtime *Runtime) Start(ctx context.Context) {
 	ctx, runtime.cancel = context.WithCancel(ctx)
+	runtime.wg, ctx = errgroup.WithContext(ctx)
 
 	slog.Info(
 		"worker initialized",
@@ -125,22 +140,20 @@ func (runtime *Runtime) Start(ctx context.Context) {
 
 	for _, job := range runtime.jobs {
 		if job.Interval > 0 {
-			runtime.wg.Add(1)
-			go func() {
-				defer runtime.wg.Done()
+			runtime.wg.Go(func() error {
 				runJob(ctx, job)
-			}()
+				return nil
+			})
 		}
 	}
 
-	runtime.wg.Add(1)
-	go func() {
-		defer runtime.wg.Done()
+	runtime.wg.Go(func() error {
 		runtime.pollLoop(ctx)
-	}()
+		return nil
+	})
 }
 
-// Close cancels all running goroutines, waits for them to drain, then
+// Close cancels the runtime, waits for running jobs to finish, then
 // closes the dedicated worker database.
 func (runtime *Runtime) Close() error {
 	if runtime.database == nil {
@@ -151,7 +164,9 @@ func (runtime *Runtime) Close() error {
 		runtime.cancel()
 	}
 
-	runtime.wg.Wait()
+	if runtime.wg != nil {
+		_ = runtime.wg.Wait()
+	}
 
 	err := runtime.database.Close()
 	runtime.database = nil
@@ -159,7 +174,7 @@ func (runtime *Runtime) Close() error {
 	return err
 }
 
-// Enqueue writes a job to the DB queue for asynchronous execution.
+// Enqueue adds an on-demand job to the queue for execution by the poll loop.
 func (runtime *Runtime) Enqueue(name string, payload any) error {
 	if _, ok := runtime.jobMap[name]; !ok {
 		return fmt.Errorf("[worker:Enqueue] unknown job: %s", name)
@@ -168,22 +183,12 @@ func (runtime *Runtime) Enqueue(name string, payload any) error {
 	return runtime.queue.enqueue(name, payload)
 }
 
-// TriggerJob spawns a one-off run of the named job directly.
-func (runtime *Runtime) TriggerJob(name string, payload any) error {
-	job, ok := runtime.jobMap[name]
-	if !ok {
-		return fmt.Errorf("[worker:TriggerJob] unknown job: %s", name)
-	}
-
-	runtime.wg.Add(1)
-	go func() {
-		defer runtime.wg.Done()
-		runOnce(context.Background(), job, payload)
-	}()
-
-	return nil
+// Stats returns a snapshot of the background queue.
+func (runtime *Runtime) Stats(ctx context.Context) (Stats, error) {
+	return runtime.queue.stats(ctx)
 }
 
+// pollLoop periodically claims pending jobs and processes them.
 func (runtime *Runtime) pollLoop(ctx context.Context) {
 	runtime.queue.resetOrphaned(ctx)
 
@@ -200,6 +205,7 @@ func (runtime *Runtime) pollLoop(ctx context.Context) {
 	}
 }
 
+// processQueue claims pending jobs from the queue and executes each in its own goroutine.
 func (runtime *Runtime) processQueue(ctx context.Context) {
 	records, err := runtime.queue.claimPending(ctx)
 	if err != nil {
@@ -213,14 +219,14 @@ func (runtime *Runtime) processQueue(ctx context.Context) {
 	}
 
 	for _, record := range records {
-		runtime.wg.Add(1)
-		go func() {
-			defer runtime.wg.Done()
+		runtime.wg.Go(func() error {
 			runtime.executeQueued(ctx, record)
-		}()
+			return nil
+		})
 	}
 }
 
+// executeQueued runs a single queued job, handling success, retry, and bury logic.
 func (runtime *Runtime) executeQueued(ctx context.Context, record jobRecord) {
 	job, ok := runtime.jobMap[record.name]
 	if !ok {
@@ -341,9 +347,9 @@ func (runtime *Runtime) executeQueued(ctx context.Context, record jobRecord) {
 	}
 }
 
+// runJob runs the job on its Interval ticker. The first run fires one Interval after Start, not immediately, so a
+// server restart does not trigger a burst of scheduled jobs all at once.
 func runJob(ctx context.Context, job Job) {
-	runOnce(ctx, job, nil)
-
 	ticker := time.NewTicker(job.Interval)
 	defer ticker.Stop()
 
@@ -357,6 +363,7 @@ func runJob(ctx context.Context, job Job) {
 	}
 }
 
+// runOnce executes the job's Run function and logs the outcome.
 func runOnce(ctx context.Context, job Job, payload any) {
 	slog.InfoContext(
 		ctx, "job started",

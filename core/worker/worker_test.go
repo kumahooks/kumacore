@@ -41,7 +41,7 @@ CREATE TABLE job_graveyard (
 );
 `
 
-func TestRuntime_Register_JobsAvailableAfterStart(t *testing.T) {
+func TestRuntime_Register_RegistersJobs(t *testing.T) {
 	runtime := newTestRuntime(t)
 
 	if err := runtime.Register(
@@ -51,24 +51,20 @@ func TestRuntime_Register_JobsAvailableAfterStart(t *testing.T) {
 		t.Fatalf("Register: %v", err)
 	}
 
-	runtime.Start(context.Background())
-
-	if err := runtime.TriggerJob("test:alpha", nil); err != nil {
-		t.Errorf("test:alpha not found after Start: %v", err)
-	}
-
-	if err := runtime.TriggerJob("test:beta", nil); err != nil {
-		t.Errorf("test:beta not found after Start: %v", err)
+	for _, jobName := range []string{"test:alpha", "test:beta"} {
+		if _, registered := runtime.jobMap[jobName]; !registered {
+			t.Errorf("job %q not registered", jobName)
+		}
 	}
 }
 
-func TestRuntime_Start_ScheduledJobRunsImmediately(t *testing.T) {
+func TestRuntime_Start_ScheduledJobWaitsForInterval(t *testing.T) {
 	runtime := newTestRuntime(t)
 	executed := make(chan struct{}, 1)
 
 	if err := runtime.Register(Job{
 		Name:     "test:scheduled",
-		Interval: time.Hour,
+		Interval: 100 * time.Millisecond,
 		Run: func(ctx context.Context, payload any) error {
 			select {
 			case executed <- struct{}{}:
@@ -84,8 +80,14 @@ func TestRuntime_Start_ScheduledJobRunsImmediately(t *testing.T) {
 
 	select {
 	case <-executed:
+		t.Error("scheduled job ran before its interval elapsed")
+	case <-time.After(20 * time.Millisecond):
+	}
+
+	select {
+	case <-executed:
 	case <-time.After(time.Second):
-		t.Error("scheduled job did not run immediately on Start")
+		t.Error("scheduled job did not run after its interval elapsed")
 	}
 }
 
@@ -223,6 +225,96 @@ func TestQueue_ResetOrphaned(t *testing.T) {
 
 	if status != "pending" {
 		t.Errorf("status: got %q, want pending", status)
+	}
+}
+
+func TestQueue_Stats(t *testing.T) {
+	runtime := newTestRuntime(t)
+
+	insertStatements := []string{
+		"INSERT INTO job_queue (id, name, attempts, status, created_at, updated_at) VALUES ('pending-old', 'test:job', 0, 'pending', 50, 50)",
+		"INSERT INTO job_queue (id, name, attempts, status, created_at, updated_at) VALUES ('pending-new', 'test:job', 0, 'pending', 100, 100)",
+		"INSERT INTO job_queue (id, name, attempts, status, created_at, updated_at) VALUES ('running', 'test:job', 1, 'running', 10, 10)",
+		"INSERT INTO job_graveyard (id, name, attempts, last_error, buried_at) VALUES ('buried', 'test:job', 3, 'failed', 200)",
+		"INSERT INTO job_history (id, name, attempts, completed_at) VALUES ('history', 'test:job', 1, 300)",
+	}
+
+	for _, statement := range insertStatements {
+		if _, err := runtime.database.Exec(statement); err != nil {
+			t.Fatalf("insert stats fixture: %v", err)
+		}
+	}
+
+	stats, err := runtime.Stats(context.Background())
+	if err != nil {
+		t.Fatalf("Stats: %v", err)
+	}
+
+	if stats.Pending != 2 {
+		t.Errorf("pending: got %d, want 2", stats.Pending)
+	}
+
+	if stats.Running != 1 {
+		t.Errorf("running: got %d, want 1", stats.Running)
+	}
+
+	if stats.Buried != 1 {
+		t.Errorf("buried: got %d, want 1", stats.Buried)
+	}
+
+	if stats.History != 1 {
+		t.Errorf("history: got %d, want 1", stats.History)
+	}
+
+	if stats.OldestPendingAt != 50 {
+		t.Errorf("oldest pending at: got %d, want 50", stats.OldestPendingAt)
+	}
+}
+
+func TestRuntime_Close_CancelsRunningJobs(t *testing.T) {
+	runtime := newTestRuntime(t)
+	started := make(chan struct{}, 1)
+
+	if err := runtime.Register(Job{
+		Name: "test:waits-for-cancel",
+		Run: func(ctx context.Context, payload any) error {
+			select {
+			case started <- struct{}{}:
+			default:
+			}
+
+			<-ctx.Done()
+
+			return nil
+		},
+	}); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	if err := runtime.Enqueue("test:waits-for-cancel", nil); err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+
+	runtime.Start(context.Background())
+
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("queued job did not start")
+	}
+
+	closeResult := make(chan error, 1)
+	go func() {
+		closeResult <- runtime.Close()
+	}()
+
+	select {
+	case err := <-closeResult:
+		if err != nil {
+			t.Errorf("Close: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Close did not wait for the running job to stop")
 	}
 }
 

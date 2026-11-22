@@ -88,6 +88,7 @@ What it does:
 - app repositories depend on small DB interfaces instead of concrete SQLite types
 - dialect metadata stays minimal and runtime-focused
 - SQLite open behavior remains the supported runtime path
+- SQLite connections enable WAL, `synchronous=NORMAL`, foreign keys, and a 5000 ms busy timeout through DSN pragmas
 
 ### `core/db/migrate`
 
@@ -99,6 +100,7 @@ What it does:
 - filenames must match `NNNN_slug.sql`
 - sequence numbers must be contiguous and unique
 - applied migration checksums must match current file contents
+- applied migration timestamps are recorded in UTC
 - validation runs before execution and any invalid state aborts execution
 
 ### `core/worker`
@@ -110,6 +112,8 @@ What it does:
 - worker runtime is gated by `CORE_WORKER_ENABLED`
 - worker runtime uses a dedicated SQLite database
 - job queue lifecycle supports pending, running, retry, complete, and graveyard behavior
+- queue timestamps are recorded in UTC
+- `Runtime.Stats` reports pending, running, buried, and history counts plus the oldest pending timestamp
 - orphaned running jobs are reset during startup
 - app job handlers are registered explicitly by bootstrap code
 

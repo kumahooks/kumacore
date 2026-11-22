@@ -447,7 +447,7 @@ func applyMigration(ctx context.Context, databaseConnection driver.DBTX, migrati
 		migrationFile.sequence,
 		migrationFile.filename,
 		migrationFile.checksum,
-		time.Now().Unix(),
+		time.Now().UTC().Unix(),
 	); err != nil {
 		return fmt.Errorf("[database:migrate:applyMigration] record %04d: %w", migrationFile.sequence, err)
 	}

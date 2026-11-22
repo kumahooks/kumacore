@@ -19,16 +19,20 @@ var (
 	retryJobQuery        = mustReadQuery(workerQueryFiles, "queries/retry_job.sql")
 	insertGraveyardQuery = mustReadQuery(workerQueryFiles, "queries/insert_graveyard.sql")
 	resetOrphanedQuery   = mustReadQuery(workerQueryFiles, "queries/reset_orphaned.sql")
+	queueStatsQuery      = mustReadQuery(workerQueryFiles, "queries/queue_stats.sql")
 )
 
+// SQLQueueRepository implements queue persistence operations against a SQL database.
 type SQLQueueRepository struct {
 	database *sql.DB
 }
 
+// newSQLQueueRepository creates a repository backed by the given database connection.
 func newSQLQueueRepository(database *sql.DB) *SQLQueueRepository {
 	return &SQLQueueRepository{database: database}
 }
 
+// Enqueue inserts a new pending job into the queue.
 func (repository *SQLQueueRepository) Enqueue(
 	ctx context.Context,
 	id string,
@@ -41,6 +45,7 @@ func (repository *SQLQueueRepository) Enqueue(
 	return err
 }
 
+// ClaimPending claims all pending jobs, setting them to running, and returns the records.
 func (repository *SQLQueueRepository) ClaimPending(ctx context.Context, updatedAtUnix int64) ([]jobRecord, error) {
 	rows, err := repository.database.QueryContext(ctx, claimPendingQuery, updatedAtUnix)
 	if err != nil {
@@ -65,6 +70,7 @@ func (repository *SQLQueueRepository) ClaimPending(ctx context.Context, updatedA
 	return records, nil
 }
 
+// Complete moves a completed job into the history table and deletes it from the queue.
 func (repository *SQLQueueRepository) Complete(
 	ctx context.Context,
 	record jobRecord,
@@ -97,12 +103,14 @@ func (repository *SQLQueueRepository) Complete(
 	return transaction.Commit()
 }
 
+// Retry resets a failed job back to pending with an incremented attempt count.
 func (repository *SQLQueueRepository) Retry(ctx context.Context, id string, attempts int, updatedAtUnix int64) error {
 	_, err := repository.database.ExecContext(ctx, retryJobQuery, attempts, updatedAtUnix, id)
 
 	return err
 }
 
+// Bury moves a permanently failed job into the graveyard and deletes it from the queue.
 func (repository *SQLQueueRepository) Bury(
 	ctx context.Context,
 	record jobRecord,
@@ -137,6 +145,25 @@ func (repository *SQLQueueRepository) Bury(
 	return transaction.Commit()
 }
 
+// Stats returns queue counts and the oldest pending job's creation time.
+func (repository *SQLQueueRepository) Stats(ctx context.Context) (Stats, error) {
+	var stats Stats
+
+	err := repository.database.QueryRowContext(ctx, queueStatsQuery).Scan(
+		&stats.Pending,
+		&stats.Running,
+		&stats.OldestPendingAt,
+		&stats.Buried,
+		&stats.History,
+	)
+	if err != nil {
+		return Stats{}, err
+	}
+
+	return stats, nil
+}
+
+// ResetOrphaned resets stuck running jobs back to pending so they can be retried.
 func (repository *SQLQueueRepository) ResetOrphaned(ctx context.Context, updatedAtUnix int64) (int64, error) {
 	result, err := repository.database.ExecContext(ctx, resetOrphanedQuery, updatedAtUnix)
 	if err != nil {

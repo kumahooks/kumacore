@@ -1,8 +1,7 @@
 // Package db provides migrated database templates for tests.
 //
-// The template is migration-only: it applies app migrations to produce a bare
-// schema with no seed data. Tests create the records they need through
-// testfactory functions.
+// The template is migration-only: it applies the given migration source to produce a bare schema with no seed data.
+// Tests create the records they need through testfactory functions.
 package db
 
 import (
@@ -25,19 +24,27 @@ type Template struct {
 	path string
 }
 
-// NewTemplate creates one migrated template database for a test package,
-// runs testingMain, and cleans up the template directory.
+// NewTemplate creates one migrated app template database for a test package, runs testingMain, and cleans up the template directory.
 func NewTemplate(testingMain *testing.M, template **Template) int {
+	return newTemplate(testingMain, template, migrations.AppSource())
+}
+
+// NewWorkerTemplate creates one migrated worker template database for a test package, runs testingMain, and cleans up the template directory.
+func NewWorkerTemplate(testingMain *testing.M, template **Template) int {
+	return newTemplate(testingMain, template, migrations.WorkerSource())
+}
+
+func newTemplate(testingMain *testing.M, template **Template, source migrate.Source) int {
 	directory, err := os.MkdirTemp("", "kumacore-test-*")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[db:NewTemplate] create test directory: %v\n", err)
+		fmt.Fprintf(os.Stderr, "[db:newTemplate] create test directory: %v\n", err)
 		return 1
 	}
 
-	exitCode := run(testingMain, template, directory)
+	exitCode := run(testingMain, template, directory, source)
 
 	if err := os.RemoveAll(directory); err != nil {
-		fmt.Fprintf(os.Stderr, "[db:NewTemplate] remove test directory: %v\n", err)
+		fmt.Fprintf(os.Stderr, "[db:newTemplate] remove test directory: %v\n", err)
 		return 1
 	}
 
@@ -61,7 +68,7 @@ func (template *Template) Open(testingHandle testing.TB) *sql.DB {
 	return database
 }
 
-func run(testingMain *testing.M, template **Template, directory string) int {
+func run(testingMain *testing.M, template **Template, directory string, source migrate.Source) int {
 	templatePath := filepath.Join(directory, "migrated.db")
 	database, _, err := coredb.Open(sqlite.DriverName, templatePath)
 	if err != nil {
@@ -73,7 +80,7 @@ func run(testingMain *testing.M, template **Template, directory string) int {
 		context.Background(),
 		database,
 		sqlite.Dialect{},
-		migrations.AppSource(),
+		source,
 	); err != nil {
 		_ = database.Close()
 		fmt.Fprintf(os.Stderr, "[db:run] apply migrations: %v\n", err)

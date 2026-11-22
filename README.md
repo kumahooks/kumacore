@@ -68,6 +68,12 @@ Migrations are SQL-only and centralized:
 
 Startup validates the migration stream before executing anything. Invalid filenames, sequence gaps, duplicate sequences, checksum mismatches, or missing applied files abort startup and run zero migrations.
 
+SQLite connections enable WAL, `synchronous=NORMAL`, foreign keys, and a 5000 ms busy timeout through DSN pragmas.
+
+## Worker Runtime
+
+Worker runtime is optional and gated by `CORE_WORKER_ENABLED`. It uses a dedicated SQLite database, resets orphaned running jobs at startup, and exposes queue counts through `Runtime.Stats`. Scheduled jobs first run one interval after start, then repeat at that interval.
+
 ## Public Contract
 
 Surfaces and behaviors are documented in [CONTRACT.md](./CONTRACT.md).
