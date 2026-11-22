@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"kumacore/core/httpx"
+	logx "kumacore/core/log"
 	"kumacore/core/render"
 )
 
@@ -21,13 +23,17 @@ func (application *App) Initialize(ctx context.Context) error {
 		ctx = context.Background()
 	}
 
-	logFile, err := application.initLogging()
+	writer, logFile, err := application.initLogging()
 	if err != nil {
 		return err
 	}
+
 	application.runtime.logFile = logFile
 
-	log.Printf("[app:Initialize] logging initialized")
+	logx.Setup(writer, application.options.Configuration.Core.App.Dev)
+	log.SetOutput(writer)
+
+	slog.Info("logging initialized", slog.String("caller", "app:Initialize"))
 
 	if err := application.runMigrations(ctx); err != nil {
 		application.close()
@@ -62,21 +68,24 @@ func (application *App) Initialize(ctx context.Context) error {
 		application.runtime.renderer = templateManager
 	}
 
-	log.Printf("[app:Initialize] templates initialized (dev=%v)", application.options.Configuration.Core.App.Dev)
+	slog.Info(
+		"templates initialized",
+		slog.String("caller", "app:Initialize"),
+		slog.Bool("dev", application.options.Configuration.Core.App.Dev),
+	)
 
 	application.runtime.router = application.newRouter(application.options.Middleware)
 
 	httpx.RegisterStatic(application.runtime.router, application.options.StaticDir)
 	httpx.RegisterRoutes(application.runtime.router, application.options.Routes...)
 
-	log.Printf("[app:Initialize] routes registered")
+	slog.Info("routes registered", slog.String("caller", "app:Initialize"))
 
 	return nil
 }
 
-// Start binds the server to addr and begins serving requests.
-// Blocks until SIGINT or SIGTERM is received, then drains in-flight requests
-// with a 30-second deadline before returning.
+// Start binds the server to addr and begins serving requests. Blocks until SIGINT or SIGTERM is received, then drains
+// in-flight requests with a 30-second deadline before returning.
 func (application *App) Start(addr string) error {
 	if application.runtime.router == nil {
 		return fmt.Errorf("[app:Start] app is not initialized")
@@ -96,14 +105,17 @@ func (application *App) Start(addr string) error {
 
 	if application.options.WorkerRuntime != nil && application.options.Configuration.Core.Worker.Enabled {
 		application.options.WorkerRuntime.Start(shutdownContext)
-		log.Printf("[app:Start] worker started")
+		slog.Info("worker started", slog.String("caller", "app:Start"))
 	}
-
 	defer application.close()
 
 	serverErrors := make(chan error, 1)
 	go func() {
-		log.Printf("[app:Start] server starting on %s", addr)
+		slog.Info(
+			"server starting",
+			slog.String("caller", "app:Start"),
+			slog.String("addr", addr),
+		)
 
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			serverErrors <- err
@@ -116,7 +128,7 @@ func (application *App) Start(addr string) error {
 	case <-shutdownContext.Done():
 		stop()
 
-		log.Printf("[app:Start] server shutting down")
+		slog.Info("server shutting down", slog.String("caller", "app:Start"))
 
 		drainContext, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()

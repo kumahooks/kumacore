@@ -3,7 +3,7 @@ package auth
 
 import (
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -75,7 +75,11 @@ func (handler *Handler) Authenticate(writer http.ResponseWriter, request *http.R
 			return
 		}
 
-		log.Printf("[auth:Authenticate] authenticate: %v", err)
+		slog.ErrorContext(
+			request.Context(), "authenticate",
+			slog.String("caller", "auth:Authenticate"),
+			slog.Any("err", err),
+		)
 
 		writer.WriteHeader(http.StatusInternalServerError)
 		handler.renderLogin(writer, request, "internal server error")
@@ -93,7 +97,11 @@ func (handler *Handler) Logout(writer http.ResponseWriter, request *http.Request
 	sessionCookie, err := request.Cookie("session")
 	if err == nil {
 		if err := handler.authService.Logout(request.Context(), sessionCookie.Value); err != nil {
-			log.Printf("[auth:Logout] logout: %v", err)
+			slog.ErrorContext(
+				request.Context(), "delete session",
+				slog.String("caller", "auth:Logout"),
+				slog.Any("err", err),
+			)
 		}
 	}
 
@@ -110,7 +118,12 @@ func (handler *Handler) Me(writer http.ResponseWriter, request *http.Request) {
 	data := map[string]any{"Title": "auth/me", "User": user}
 
 	if err := handler.renderer.Render(writer, request, pageFile, "page-content", data); err != nil {
-		log.Printf("[auth:Me] render: %v", err)
+		slog.ErrorContext(
+			request.Context(), "render",
+			slog.String("caller", "auth:Me"),
+			slog.Any("err", err),
+		)
+
 		http.Error(writer, "internal server error", http.StatusInternalServerError)
 	}
 }
@@ -124,7 +137,12 @@ func (handler *Handler) renderLogin(writer http.ResponseWriter, request *http.Re
 	}
 
 	if err := handler.renderer.Render(writer, request, pageFile, "page-content", data); err != nil {
-		log.Printf("[auth:renderLogin] render: %v", err)
+		slog.ErrorContext(
+			request.Context(), "render",
+			slog.String("caller", "auth:renderLogin"),
+			slog.Any("err", err),
+		)
+
 		http.Error(writer, "internal server error", http.StatusInternalServerError)
 	}
 }

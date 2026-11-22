@@ -8,7 +8,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/fs"
-	"log"
+	"log/slog"
 	"path"
 	"sort"
 	"strconv"
@@ -124,7 +124,7 @@ func ApplyPlan(ctx context.Context, databaseConnection connection, plan Plan) er
 	}
 
 	if len(plan.pendingMigrations) == 0 {
-		log.Printf("[database:migrate:ApplyPlan] migrations up to date")
+		slog.InfoContext(ctx, "migrations up to date", slog.String("caller", "database:migrate:ApplyPlan"))
 		return nil
 	}
 
@@ -150,14 +150,19 @@ func ApplyPlan(ctx context.Context, databaseConnection connection, plan Plan) er
 	}
 
 	for _, migrationFile := range plan.pendingMigrations {
-		log.Printf(
-			"[database:migrate:ApplyPlan] applied migration %04d (%s)",
-			migrationFile.sequence,
-			migrationFile.filename,
+		slog.InfoContext(
+			ctx, "applied migration",
+			slog.String("caller", "database:migrate:ApplyPlan"),
+			slog.Int("sequence", migrationFile.sequence),
+			slog.String("filename", migrationFile.filename),
 		)
 	}
 
-	log.Printf("[database:migrate:ApplyPlan] %d migration(s) applied", len(plan.pendingMigrations))
+	slog.InfoContext(
+		ctx, "migrations applied",
+		slog.String("caller", "database:migrate:ApplyPlan"),
+		slog.Int("count", len(plan.pendingMigrations)),
+	)
 
 	return nil
 }

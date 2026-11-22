@@ -12,6 +12,8 @@ Purpose:
 What it does:
 - startup follows the fixed boot order documented by the repository architecture
 - initialization aborts on any startup failure
+- logging is initialized first: the console and `data/logs` writer is opened, then the slog default logger is installed
+- log files are named by UTC date and rotate at UTC midnight
 - static registration, route registration, migration execution, and optional worker startup are explicit lifecycle steps
 - graceful shutdown closes runtime resources explicitly
 - the HTTP server sets a 5-minute read timeout alongside header, write, and idle timeouts
@@ -45,6 +47,20 @@ What it does:
 - `LimitRequestBody` caps request body reads with `http.MaxBytesReader`. Non-positive limits disable the cap
 - `SetCookie` and `ClearCookie` write session cookies with Path `/`, HttpOnly, caller-selected Secure, and SameSite Strict
 - `ClearCookie` expires the cookie with MaxAge -1
+
+### `core/log`
+
+Purpose:
+- slog default logger configuration and request correlation
+
+What it does:
+- `Setup` installs the slog default logger, Debug in development and Info in production
+- records use a single-line format: `(2006-01-02T15:04:05.000-07:00) [LEVEL - caller] message key=value`
+- `caller` is passed as an attribute and rendered inside the level brackets
+- `RequestIDMiddleware` trusts an inbound `X-Request-Id`, truncates it to 64 bytes, generates 16 random bytes when absent, stores it in the request context, and echoes it on the response
+- `RequestLogger` emits one line per request with method, path, status, and duration
+- records logged with a request context carry `request_id`
+- the status recorder exposes `Unwrap` so `http.ResponseController` reaches the real connection
 
 ### `core/render`
 

@@ -6,7 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -19,9 +19,8 @@ import (
 // backupFilenamePattern matches backup_YYYYMMDD_<suffix>.zip.
 var backupFilenamePattern = regexp.MustCompile(`^backup_(\d{8})_(daily|weekly)\.zip$`)
 
-// skipExtensions are file extensions in dataDir that are never copied raw:
-// the .db files are replaced by online backup snapshots, an WAL/SHM are
-// SQLite-internal stuff.
+// skipExtensions are file extensions in dataDir that are never copied raw: the .db files are replaced by online backup
+// snapshots, and WAL/SHM are SQLite-internal stuff.
 var skipExtensions = map[string]bool{
 	".db":     true,
 	".db-shm": true,
@@ -29,8 +28,8 @@ var skipExtensions = map[string]bool{
 	".zip":    true,
 }
 
-// createBackup snapshots both databases to temp files, zips the contents of
-// dataDir plus the snapshots into backupDir, and returns the created zip path.
+// createBackup snapshots both databases to temp files, zips the contents of dataDir plus the snapshots into backupDir,
+// and returns the created zip path.
 func createBackup(
 	ctx context.Context,
 	appDatabase *sql.DB,
@@ -103,8 +102,8 @@ func createBackup(
 	return zipPath, nil
 }
 
-// snapshotDatabase writes a consistent snapshot of database to a temp file in
-// the OS temp dir and returns its path. The caller must remove the file.
+// snapshotDatabase writes a consistent snapshot of database to a temp file in the OS temp dir and returns its path. The
+// caller must remove the file.
 func snapshotDatabase(ctx context.Context, database *sql.DB) (string, error) {
 	tempFile, err := os.CreateTemp("", "database-backup-*.db")
 	if err != nil {
@@ -122,13 +121,18 @@ func snapshotDatabase(ctx context.Context, database *sql.DB) (string, error) {
 	return tempPath, nil
 }
 
-// zipDataDir walks dataDir and adds every non-skipped file to zipWriter using
-// its path relative to dataDir as the archive entry name.
+// zipDataDir walks dataDir and adds every non-skipped file to zipWriter using its path relative to dataDir as the archive
+// entry name.
 func zipDataDir(zipWriter *zip.Writer, dataDir string) error {
 	return filepath.WalkDir(dataDir, func(path string, dirEntry os.DirEntry, err error) error {
 		if err != nil {
 			if os.IsNotExist(err) {
-				log.Printf("[backup:zipDataDir] data dir does not exist: %s", dataDir)
+				slog.Warn(
+					"data dir does not exist",
+					slog.String("caller", "backup:zipDataDir"),
+					slog.String("path", dataDir),
+				)
+
 				return nil
 			}
 
@@ -186,8 +190,8 @@ func addFileToZip(zipWriter *zip.Writer, filePath string, name string) error {
 	return err
 }
 
-// pruneByDate deletes backups in backupDir whose filename date is older than
-// maxAge. Only backups matching the given suffix are considered.
+// pruneByDate deletes backups in backupDir whose filename date is older than maxAge. Only backups matching the given
+// suffix are considered.
 func pruneByDate(backupDir string, suffix string, maxAge time.Duration) (int, error) {
 	cutoff := time.Now().UTC().Add(-maxAge)
 	deletedCount := 0
@@ -219,7 +223,13 @@ func pruneByDate(backupDir string, suffix string, maxAge time.Duration) (int, er
 
 		if backupDate.Before(cutoff) {
 			if err := os.Remove(filepath.Join(backupDir, name)); err != nil {
-				log.Printf("[backup:pruneByDate] remove %s: %v", name, err)
+				slog.Error(
+					"remove backup by date",
+					slog.String("caller", "backup:pruneByDate"),
+					slog.String("name", name),
+					slog.Any("err", err),
+				)
+
 				continue
 			}
 
@@ -230,8 +240,7 @@ func pruneByDate(backupDir string, suffix string, maxAge time.Duration) (int, er
 	return deletedCount, nil
 }
 
-// pruneByCount deletes the oldest backups of a given suffix until at most keep
-// remain. Returns the number deleted.
+// pruneByCount deletes the oldest backups of a given suffix until at most keep remain. Returns the number deleted.
 func pruneByCount(backupDir string, suffix string, keep int) (int, error) {
 	backups, err := listBackupsBySuffix(backupDir, suffix)
 	if err != nil {
@@ -242,11 +251,17 @@ func pruneByCount(backupDir string, suffix string, keep int) (int, error) {
 		return 0, nil
 	}
 
-	// backups is sorted oldest first; delete everything past the keep newest.
+	// backups is sorted oldest first. Delete everything past the keep newest.
 	deletedCount := 0
 	for i := 0; i < len(backups)-keep; i++ {
 		if err := os.Remove(filepath.Join(backupDir, backups[i].name)); err != nil {
-			log.Printf("[backup:pruneByCount] remove %s: %v", backups[i].name, err)
+			slog.Error(
+				"remove backup by count",
+				slog.String("caller", "backup:pruneByCount"),
+				slog.String("name", backups[i].name),
+				slog.Any("err", err),
+			)
+
 			continue
 		}
 
@@ -256,8 +271,7 @@ func pruneByCount(backupDir string, suffix string, keep int) (int, error) {
 	return deletedCount, nil
 }
 
-// deleteStrayFiles removes files in backupDir that do not match the backup
-// filename pattern. Directories are left untouched.
+// deleteStrayFiles removes files in backupDir that do not match the backup filename pattern. Directories are left untouched.
 func deleteStrayFiles(backupDir string) (int, error) {
 	dirEntries, err := os.ReadDir(backupDir)
 	if err != nil {
@@ -280,7 +294,12 @@ func deleteStrayFiles(backupDir string) (int, error) {
 		}
 
 		if err := os.Remove(filepath.Join(backupDir, name)); err != nil {
-			log.Printf("[backup:deleteStrayFiles] remove %s: %v", name, err)
+			slog.Error(
+				"remove stray backup file",
+				slog.String("caller", "backup:deleteStrayFiles"),
+				slog.String("name", name),
+				slog.Any("err", err),
+			)
 			continue
 		}
 

@@ -2,7 +2,7 @@ package logging
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -43,7 +43,13 @@ func deleteOldLogs(dir string) (int, error) {
 		if logDate.Before(cutoffDate) {
 			logPath := filepath.Join(dir, name)
 			if err := os.Remove(logPath); err != nil {
-				log.Printf("[logging:deleteOldLogs] remove %s: %v", name, err)
+				slog.Error(
+					"remove old log file",
+					slog.String("caller", "logging:deleteOldLogs"),
+					slog.String("name", name),
+					slog.Any("err", err),
+				)
+
 				continue
 			}
 

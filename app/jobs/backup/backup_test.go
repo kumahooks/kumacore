@@ -388,14 +388,13 @@ func TestCleanup_EnforcesCountRetention(t *testing.T) {
 	backupDir := t.TempDir()
 
 	now := time.Now().UTC()
-	// Seed 4 daily backups (all within the date window); cleanup must keep
-	// the 3 newest and delete the oldest.
+	// Seed 4 daily backups (all within the date window), cleanup must keep the 3 newest and delete the oldest.
 	for _, daysAgo := range []int{3, 2, 1, 0} {
 		name := "backup_" + now.AddDate(0, 0, -daysAgo).Format("20060102") + "_daily.zip"
 		writeFile(t, backupDir, name, "daily")
 	}
 
-	// Seed 2 weekly backups; both must survive.
+	// Seed 2 weekly backups, both must survive.
 	for _, weeksAgo := range []int{1, 0} {
 		name := "backup_" + now.AddDate(0, 0, -weeksAgo*7).Format("20060102") + "_weekly.zip"
 		writeFile(t, backupDir, name, "weekly")

@@ -2,7 +2,7 @@
 package home
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -38,7 +38,12 @@ func (handler *Handler) Index(writer http.ResponseWriter, request *http.Request)
 	}
 
 	if err := handler.renderer.Render(writer, request, pageFile, "page-content", data); err != nil {
-		log.Printf("[home:Index] render: %v", err)
+		slog.ErrorContext(
+			request.Context(), "render",
+			slog.String("caller", "home:Index"),
+			slog.Any("err", err),
+		)
+
 		http.Error(writer, "internal server error", http.StatusInternalServerError)
 	}
 }

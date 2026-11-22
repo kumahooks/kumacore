@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -366,7 +367,10 @@ func writeTestFile(t *testing.T, path string, contents string) {
 
 func testConfiguration(t *testing.T) *config.Config {
 	t.Helper()
+
+	previousLogger := slog.Default()
 	t.Cleanup(func() {
+		slog.SetDefault(previousLogger)
 		log.SetOutput(os.Stderr)
 	})
 

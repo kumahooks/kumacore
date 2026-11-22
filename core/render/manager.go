@@ -27,7 +27,7 @@ import (
 	"html/template"
 	"io"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net/http"
 	"path"
 	"sync"
@@ -150,7 +150,11 @@ func (templateManager *Manager) RenderError(
 
 	pageTemplate, err := templateManager.resolve(templateManager.errorTemplatePath)
 	if err != nil {
-		log.Printf("[render:RenderError] resolve error template: %v", err)
+		slog.ErrorContext(
+			request.Context(), "resolve error template",
+			slog.String("caller", "render:RenderError"),
+			slog.Any("err", err),
+		)
 
 		http.Error(writer, message, status)
 
@@ -159,7 +163,11 @@ func (templateManager *Manager) RenderError(
 
 	var buffer bytes.Buffer
 	if err := templateManager.executeTemplate(&buffer, pageTemplate, request, "page-content", data); err != nil {
-		log.Printf("[render:RenderError] render error template: %v", err)
+		slog.ErrorContext(
+			request.Context(), "render error template",
+			slog.String("caller", "render:RenderError"),
+			slog.Any("err", err),
+		)
 
 		http.Error(writer, message, status)
 

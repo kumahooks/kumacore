@@ -4,7 +4,7 @@ package sqlite
 import (
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/url"
 	"strings"
 
@@ -25,14 +25,21 @@ func Open(path string) (*sql.DB, error) {
 		return nil, fmt.Errorf("[database:sqlite:Open] open: %w", err)
 	}
 
-	// SQLite :memory: creates one isolated DB per connection.
-	// Keep a single pooled connection so schema/data remain consistent in tests.
+	// SQLite :memory: creates one isolated DB per connection. Keep a single pooled connection so schema/data remain consistent
+	// in tests.
 	if path == ":memory:" || strings.HasPrefix(path, "file::memory:") {
 		database.SetMaxOpenConns(1)
 	}
 
-	log.Printf("[database:sqlite:Open] opened %s", path)
-	log.Printf("[database:sqlite:Open] configured via DSN pragmas (WAL, foreign keys)")
+	slog.Info(
+		"opened database",
+		slog.String("caller", "database:sqlite:Open"),
+		slog.String("path", path),
+	)
+	slog.Debug(
+		"configured via DSN pragmas (WAL, foreign keys)",
+		slog.String("caller", "database:sqlite:Open"),
+	)
 
 	return database, nil
 }

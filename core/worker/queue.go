@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -80,14 +80,24 @@ func (queue *jobQueue) bury(ctx context.Context, record jobRecord, attempts int,
 	return nil
 }
 
+// resetOrphaned marks any stuck running jobs back to pending.
 func (queue *jobQueue) resetOrphaned(ctx context.Context) {
 	affected, err := queue.repository.ResetOrphaned(ctx, time.Now().Unix())
 	if err != nil {
-		log.Printf("[worker:resetOrphaned] reset orphaned: %v", err)
+		slog.ErrorContext(
+			ctx, "reset orphaned jobs",
+			slog.String("caller", "worker:resetOrphaned"),
+			slog.Any("err", err),
+		)
+
 		return
 	}
 
 	if affected > 0 {
-		log.Printf("[worker:resetOrphaned] reset %d orphaned job(s)", affected)
+		slog.InfoContext(
+			ctx, "reset orphaned jobs",
+			slog.String("caller", "worker:resetOrphaned"),
+			slog.Int64("count", affected),
+		)
 	}
 }

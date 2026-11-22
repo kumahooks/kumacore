@@ -48,11 +48,12 @@ Startup is deterministic:
 2. create the renderer from the app filesystem, parsing the error template at startup in production
 3. open the SQLite adapter
 4. construct repositories, services, middleware, handlers, and jobs explicitly
-5. validate and run migrations
-6. build the HTTP stack, including the request body cap, security headers, and same-origin checks
-7. register app worker jobs when worker runtime is enabled
-8. start the optional worker runtime
-9. start the server
+5. initialize logging, installing the `slog` default logger for stdout and the UTC-dated file under `data/logs`
+6. validate and run migrations
+7. build the HTTP stack, including the request ID, request logger, request body cap, security headers, and same-origin checks
+8. register app worker jobs when worker runtime is enabled
+9. start the optional worker runtime
+10. start the server
 
 ## Database And Migrations
 

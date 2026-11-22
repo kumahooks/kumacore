@@ -9,7 +9,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -101,7 +101,12 @@ func (service *Service) Authenticate(
 	}
 
 	if err := service.repository.UpdateUserLastLogin(ctx, credentials.UserID, now.Unix()); err != nil {
-		log.Printf("[auth:Authenticate] update last login: %v", err)
+		slog.ErrorContext(
+			ctx, "update last login",
+			slog.String("caller", "auth:Authenticate"),
+			slog.String("user_id", credentials.UserID),
+			slog.Any("err", err),
+		)
 	}
 
 	return rawToken, expiresAt, nil

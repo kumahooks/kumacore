@@ -4,7 +4,7 @@ package health
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -44,12 +44,16 @@ func Routes(handler *Handler) func(chi.Router) {
 }
 
 // Live reports whether the process is running.
-func (handler *Handler) Live(writer http.ResponseWriter, _ *http.Request) {
+func (handler *Handler) Live(writer http.ResponseWriter, request *http.Request) {
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusOK)
 
 	if err := json.NewEncoder(writer).Encode(map[string]string{"status": "ok"}); err != nil {
-		log.Printf("[health:Live] encode response: %v", err)
+		slog.ErrorContext(
+			request.Context(), "encode response",
+			slog.String("caller", "health:Live"),
+			slog.Any("err", err),
+		)
 	}
 }
 
@@ -92,7 +96,11 @@ func (handler *Handler) Ready(writer http.ResponseWriter, request *http.Request)
 	}
 
 	if err := json.NewEncoder(writer).Encode(response); err != nil {
-		log.Printf("[health:Ready] encode response: %v", err)
+		slog.ErrorContext(
+			request.Context(), "encode response",
+			slog.String("caller", "health:Ready"),
+			slog.Any("err", err),
+		)
 	}
 }
 

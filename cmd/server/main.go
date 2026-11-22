@@ -4,6 +4,7 @@ import (
 	"context"
 	"io/fs"
 	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -77,6 +78,12 @@ func main() {
 	}
 
 	if err := application.Start(application.Address()); err != nil {
-		log.Fatalf("[server:main] start app: %v", err)
+		slog.Error(
+			"start app",
+			slog.String("caller", "server:main"),
+			slog.Any("err", err),
+		)
+
+		os.Exit(1)
 	}
 }

@@ -6,7 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -102,7 +102,12 @@ func (runtime *Runtime) Register(jobs ...Job) error {
 		runtime.jobs = append(runtime.jobs, job)
 		runtime.jobMap[jobName] = job
 
-		log.Printf("[worker:Register] registered %s to run every %s", job.Name, job.Interval)
+		slog.Info(
+			"registered job",
+			slog.String("caller", "worker:Register"),
+			slog.String("job", job.Name),
+			slog.Duration("interval", job.Interval),
+		)
 	}
 
 	return nil
@@ -112,7 +117,11 @@ func (runtime *Runtime) Register(jobs ...Job) error {
 func (runtime *Runtime) Start(ctx context.Context) {
 	ctx, runtime.cancel = context.WithCancel(ctx)
 
-	log.Printf("[worker:Start] initialized (%d job(s))", len(runtime.jobs))
+	slog.Info(
+		"worker initialized",
+		slog.String("caller", "worker:Start"),
+		slog.Int("jobs", len(runtime.jobs)),
+	)
 
 	for _, job := range runtime.jobs {
 		if job.Interval > 0 {
@@ -194,7 +203,12 @@ func (runtime *Runtime) pollLoop(ctx context.Context) {
 func (runtime *Runtime) processQueue(ctx context.Context) {
 	records, err := runtime.queue.claimPending(ctx)
 	if err != nil {
-		log.Printf("[worker:processQueue] poll: %v", err)
+		slog.ErrorContext(
+			ctx, "poll queue",
+			slog.String("caller", "worker:processQueue"),
+			slog.Any("err", err),
+		)
+
 		return
 	}
 
@@ -210,7 +224,12 @@ func (runtime *Runtime) processQueue(ctx context.Context) {
 func (runtime *Runtime) executeQueued(ctx context.Context, record jobRecord) {
 	job, ok := runtime.jobMap[record.name]
 	if !ok {
-		log.Printf("[worker:executeQueued] %s: unknown job (id=%s)", record.name, record.id)
+		slog.ErrorContext(
+			ctx, "unknown job",
+			slog.String("caller", "worker:executeQueued"),
+			slog.String("job", record.name),
+			slog.String("job_id", record.id),
+		)
 
 		if err := runtime.queue.bury(
 			ctx,
@@ -218,7 +237,12 @@ func (runtime *Runtime) executeQueued(ctx context.Context, record jobRecord) {
 			record.attempts,
 			fmt.Sprintf("unknown job: %s", record.name),
 		); err != nil {
-			log.Printf("[worker:executeQueued] %s: bury: %v", record.name, err)
+			slog.ErrorContext(
+				ctx, "bury unknown job",
+				slog.String("caller", "worker:executeQueued"),
+				slog.String("job", record.name),
+				slog.Any("err", err),
+			)
 		}
 
 		return
@@ -227,10 +251,21 @@ func (runtime *Runtime) executeQueued(ctx context.Context, record jobRecord) {
 	var payload any
 	if record.payload != nil {
 		if err := json.Unmarshal([]byte(*record.payload), &payload); err != nil {
-			log.Printf("[worker:executeQueued] %s: unmarshal payload: %v (id=%s)", record.name, err, record.id)
+			slog.ErrorContext(
+				ctx, "unmarshal payload",
+				slog.String("caller", "worker:executeQueued"),
+				slog.String("job", record.name),
+				slog.String("job_id", record.id),
+				slog.Any("err", err),
+			)
 
 			if err = runtime.queue.bury(ctx, record, record.attempts, err.Error()); err != nil {
-				log.Printf("[worker:executeQueued] %s: bury: %v", record.name, err)
+				slog.ErrorContext(
+					ctx, "bury unmarshal failure",
+					slog.String("caller", "worker:executeQueued"),
+					slog.String("job", record.name),
+					slog.Any("err", err),
+				)
 			}
 
 			return
@@ -238,35 +273,71 @@ func (runtime *Runtime) executeQueued(ctx context.Context, record jobRecord) {
 	}
 
 	newAttempts := record.attempts + 1
-	log.Printf("[worker:executeQueued] %s: started (attempt %d/%d)", record.name, newAttempts, runtime.maxAttempts)
+	slog.InfoContext(
+		ctx, "job started",
+		slog.String("caller", "worker:executeQueued"),
+		slog.String("job", record.name),
+		slog.Int("attempt", newAttempts),
+		slog.Int("max_attempts", runtime.maxAttempts),
+	)
 
 	start := time.Now()
-
 	runErr := job.Run(ctx, payload)
 	if runErr == nil {
-		log.Printf("[worker:executeQueued] %s: done (%s)", record.name, time.Since(start))
+		slog.InfoContext(
+			ctx, "job done",
+			slog.String("caller", "worker:executeQueued"),
+			slog.String("job", record.name),
+			slog.Duration("duration", time.Since(start)),
+		)
 
 		if err := runtime.queue.complete(ctx, record, newAttempts); err != nil {
-			log.Printf("[worker:executeQueued] %s: complete: %v", record.name, err)
+			slog.ErrorContext(
+				ctx, "complete job",
+				slog.String("caller", "worker:executeQueued"),
+				slog.String("job", record.name),
+				slog.Any("err", err),
+			)
 		}
 
 		return
 	}
 
-	log.Printf("[worker:executeQueued] %s: attempt %d failed: %v", record.name, newAttempts, runErr)
+	slog.ErrorContext(
+		ctx, "job attempt failed",
+		slog.String("caller", "worker:executeQueued"),
+		slog.String("job", record.name),
+		slog.Int("attempt", newAttempts),
+		slog.Any("err", runErr),
+	)
 
 	if newAttempts >= runtime.maxAttempts {
-		log.Printf("[worker:executeQueued] %s: max attempts reached, burying (id=%s)", record.name, record.id)
+		slog.ErrorContext(
+			ctx, "max attempts reached, burying",
+			slog.String("caller", "worker:executeQueued"),
+			slog.String("job", record.name),
+			slog.String("job_id", record.id),
+		)
 
 		if err := runtime.queue.bury(ctx, record, newAttempts, runErr.Error()); err != nil {
-			log.Printf("[worker:executeQueued] %s: bury: %v", record.name, err)
+			slog.ErrorContext(
+				ctx, "bury failed job",
+				slog.String("caller", "worker:executeQueued"),
+				slog.String("job", record.name),
+				slog.Any("err", err),
+			)
 		}
 
 		return
 	}
 
 	if err := runtime.queue.retry(ctx, record.id, newAttempts); err != nil {
-		log.Printf("[worker:executeQueued] %s: retry: %v", record.name, err)
+		slog.ErrorContext(
+			ctx, "retry job",
+			slog.String("caller", "worker:executeQueued"),
+			slog.String("job", record.name),
+			slog.Any("err", err),
+		)
 	}
 }
 
@@ -287,13 +358,29 @@ func runJob(ctx context.Context, job Job) {
 }
 
 func runOnce(ctx context.Context, job Job, payload any) {
-	log.Printf("[worker:runOnce] %s: started", job.Name)
+	slog.InfoContext(
+		ctx, "job started",
+		slog.String("caller", "worker:runOnce"),
+		slog.String("job", job.Name),
+	)
+
 	start := time.Now()
 
 	if err := job.Run(ctx, payload); err != nil {
-		log.Printf("[worker:runOnce] %s: %v", job.Name, err)
+		slog.ErrorContext(
+			ctx, "job failed",
+			slog.String("caller", "worker:runOnce"),
+			slog.String("job", job.Name),
+			slog.Any("err", err),
+		)
+
 		return
 	}
 
-	log.Printf("[worker:runOnce] %s: done (%s)", job.Name, time.Since(start))
+	slog.InfoContext(
+		ctx, "job done",
+		slog.String("caller", "worker:runOnce"),
+		slog.String("job", job.Name),
+		slog.Duration("duration", time.Since(start)),
+	)
 }
