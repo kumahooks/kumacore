@@ -47,6 +47,9 @@ What it does:
 - `LimitRequestBody` caps request body reads with `http.MaxBytesReader`. Non-positive limits disable the cap
 - `SetCookie` and `ClearCookie` write session cookies with Path `/`, HttpOnly, caller-selected Secure, and SameSite Strict
 - `ClearCookie` expires the cookie with MaxAge -1
+- `ServeUserFile` streams a user-supplied file with the shared inline policy, sets `Content-Security-Policy: default-src 'none'; sandbox`, and writes a formatted `Content-Disposition`
+- a stored content type is honored only when `media.IsInlineContentType` allows it; otherwise the response is forced to `application/octet-stream`
+- `UserFile.Attachment` forces a download even when the content type is safe inline
 
 ### `core/log`
 
@@ -61,6 +64,18 @@ What it does:
 - `RequestLogger` emits one line per request with method, path, status, and duration
 - records logged with a request context carry `request_id`
 - the status recorder exposes `Unwrap` so `http.ResponseController` reaches the real connection
+
+### `core/media`
+
+Purpose:
+- media classification and inline content policy
+
+What it does:
+- `PreviewType` classifies a filename by extension into `image`, `video`, `audio`, `text`, or `unknown`
+- `ContentType` resolves the MIME type for a filename and corrects `.webm` to `video/webm`
+- `InlineContentType` returns the content type to serve and whether it is safe inline: raster images, video, and audio keep their type, text becomes `text/plain; charset=utf-8`, everything else is treated as an attachment
+- `IsInlineContentType` accepts image, video, audio, and plain text types, and rejects SVG
+- no module consumes these primitives yet; they are an extension point for future media modules
 
 ### `core/render`
 
