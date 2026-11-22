@@ -254,6 +254,33 @@ func TestRewriteServerModules_AlwaysWiresErrorScreen(t *testing.T) {
 	}
 }
 
+func TestRewriteServerModules_AuthWiresBcrypt(t *testing.T) {
+	t.Chdir(repoRoot(t))
+
+	source, err := os.ReadFile(serverModulesPath)
+	if err != nil {
+		t.Fatalf("ReadFile %s: %v", serverModulesPath, err)
+	}
+
+	rewritten, err := rewriteServerModules(
+		source,
+		metadataFromOptions(Options{Modules: []string{"auth"}}),
+		"myapp",
+	)
+	if err != nil {
+		t.Fatalf("rewriteServerModules: %v", err)
+	}
+
+	for _, requiredSnippet := range []string{
+		`"golang.org/x/crypto/bcrypt"`,
+		`bcrypt.DefaultCost`,
+	} {
+		if !strings.Contains(string(rewritten), requiredSnippet) {
+			t.Fatalf("rewriteServerModules missing auth snippet %q:\n%s", requiredSnippet, rewritten)
+		}
+	}
+}
+
 func TestRewriteServerModules_ImportsAreGofmtFormatted(t *testing.T) {
 	t.Chdir(repoRoot(t))
 

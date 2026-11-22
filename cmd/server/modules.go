@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	// kumacore:begin modules-imports
+	"golang.org/x/crypto/bcrypt"
 	authmiddleware "kumacore/app/middleware/auth"
 	authmodule "kumacore/app/modules/auth"
 	"kumacore/app/modules/errorscreen"
@@ -44,7 +45,12 @@ func buildModules(
 	// kumacore:begin modules-setup
 	authRepository := authrepository.NewRepository(appDatabase)
 	userCache := cache.NewCache[string, authservice.CachedUser](configuration.Core.Session.CacheTTL)
-	authService, err := authservice.NewService(authRepository, configuration.Core.Session.TTL, userCache)
+	authService, err := authservice.NewService(
+		authRepository,
+		configuration.Core.Session.TTL,
+		userCache,
+		bcrypt.DefaultCost,
+	)
 	if err != nil {
 		return moduleBootstrap{}, err
 	}

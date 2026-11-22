@@ -66,7 +66,7 @@ func (handler *Handler) Authenticate(writer http.ResponseWriter, request *http.R
 		return
 	}
 
-	rawToken, expiresAt, err := handler.authService.Authenticate(request.Context(), username, password)
+	_, rawToken, expiresAt, err := handler.authService.Authenticate(request.Context(), username, password)
 	if err != nil {
 		if errors.Is(err, authservice.ErrInvalidCredentials) {
 			writer.WriteHeader(http.StatusForbidden)

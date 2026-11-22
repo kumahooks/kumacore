@@ -30,6 +30,11 @@ HTTP-facing modules live under `app/modules/`. They own routes, handlers, and re
 - `auth` login, logout, session hydration, and authenticated user status
 - `health` liveness and readiness endpoints
 
+## Authentication
+
+The auth module validates credentials, creates and restores sessions, and exposes the authenticated user status page.
+Authorization middleware can hide routes behind a 404 (`RequireAuthOrNotFound`) or require permission bits (`RequireAllPermissions`).
+
 ## Quickstart
 
 ```sh
@@ -77,3 +82,4 @@ Worker runtime is optional and gated by `CORE_WORKER_ENABLED`. It uses a dedicat
 ## Public Contract
 
 Surfaces and behaviors are documented in [CONTRACT.md](./CONTRACT.md).
+

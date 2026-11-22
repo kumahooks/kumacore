@@ -10,5 +10,13 @@
 
 <div class="auth-me-container">
 	<p class="auth-me-text">authenticated as <span class="auth-me-username">{{.User.Username}}</span></p>
+	{{$roles := .User.RoleNames}}
+	{{if $roles}}
+	<p class="auth-me-text">roles: {{range $index, $roleName := $roles}}{{if $index}}, {{end}}{{$roleName}}{{end}}</p>
+	{{end}}
+	{{$permissions := .User.PermissionDescriptions}}
+	{{if $permissions}}
+	<p class="auth-me-text">permissions: {{range $index, $description := $permissions}}{{if $index}}, {{end}}{{$description}}{{end}}</p>
+	{{end}}
 </div>
 {{end}}

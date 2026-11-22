@@ -2,10 +2,12 @@
 package authmiddleware
 
 import (
+	"log/slog"
 	"net/http"
 	"time"
 
 	authservice "kumacore/app/services/auth"
+	"kumacore/core/render"
 )
 
 // LoadAuth validates the session cookie against the database and injects the user into the request context if the session
@@ -50,5 +52,55 @@ func RequireAuth(authService *authservice.Service) func(http.Handler) http.Handl
 
 			next.ServeHTTP(writer, request)
 		}))
+	}
+}
+
+// RequireAuthOrNotFound wraps LoadAuth and renders a 404 via RenderError when no valid session is present. Use this
+// instead of RequireAuth on routes whose existence must not leak to unauthenticated visitors.
+func RequireAuthOrNotFound(
+	authService *authservice.Service,
+	renderer render.Renderer,
+) func(http.Handler) http.Handler {
+	load := LoadAuth(authService)
+
+	return func(next http.Handler) http.Handler {
+		return load(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			if _, ok := authservice.AuthUser(request.Context()); !ok {
+				renderer.RenderError(writer, request, http.StatusNotFound, "ls")
+				return
+			}
+
+			next.ServeHTTP(writer, request)
+		}))
+	}
+}
+
+// RequireAllPermissions renders a 404 via RenderError when the authenticated user lacks any of the given permission
+// bits. It reads the user from the request context, so it must be chained after RequireAuth (which loads the session
+// and injects the user).
+func RequireAllPermissions(
+	renderer render.Renderer,
+	permissions ...int64,
+) func(http.Handler) http.Handler {
+	if len(permissions) == 0 {
+		panic("[auth:RequireAllPermissions] no permissions specified")
+	}
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			user, ok := authservice.AuthUser(request.Context())
+			if !ok || !user.HasAllPermissions(permissions...) {
+				slog.InfoContext(
+					request.Context(), "access denied",
+					slog.String("caller", "auth:RequireAllPermissions"),
+				)
+
+				renderer.RenderError(writer, request, http.StatusNotFound, "ls")
+
+				return
+			}
+
+			next.ServeHTTP(writer, request)
+		})
 	}
 }

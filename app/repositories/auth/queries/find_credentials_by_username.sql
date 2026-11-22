@@ -1,3 +1,3 @@
-SELECT id, password_hash
+SELECT id, username, password_hash
 FROM users
 WHERE username = ?
