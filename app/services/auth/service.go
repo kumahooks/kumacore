@@ -20,7 +20,6 @@ import (
 	"kumacore/core/cache"
 )
 
-// ErrInvalidCredentials is returned by Authenticate when credentials are invalid.
 var ErrInvalidCredentials = errors.New("invalid credentials")
 
 // ErrUsernameTaken is returned by ChangeUsername when the requested username collides with an existing row's UNIQUE
@@ -53,7 +52,6 @@ type CachedUser struct {
 	ExpiresAt int64
 }
 
-// Service manages credential validation, session creation, and session deletion.
 type Service struct {
 	repository        authrepository.Repository
 	sessionTTL        time.Duration
@@ -64,7 +62,6 @@ type Service struct {
 	bcryptCost int
 }
 
-// NewService creates a Service backed by the given repository.
 func NewService(
 	repository authrepository.Repository,
 	sessionTTL time.Duration,
@@ -89,8 +86,6 @@ func NewService(
 	}, nil
 }
 
-// Authenticate validates username and password, creates a session, and returns the authenticated user and raw session
-// token.
 func (service *Service) Authenticate(
 	ctx context.Context,
 	username string,
@@ -154,7 +149,6 @@ func (service *Service) Authenticate(
 	return user, rawToken, expiresAt, nil
 }
 
-// Logout deletes the session identified by rawToken.
 func (service *Service) Logout(ctx context.Context, rawToken string) error {
 	tokenHash := HashToken(rawToken)
 
@@ -167,7 +161,6 @@ func (service *Service) Logout(ctx context.Context, rawToken string) error {
 	return nil
 }
 
-// UserForToken returns the authenticated user for a valid raw session token.
 func (service *Service) UserForToken(ctx context.Context, rawToken string, now time.Time) (User, error) {
 	tokenHash := HashToken(rawToken)
 
@@ -216,7 +209,6 @@ func (service *Service) loadPermissions(ctx context.Context, user *User) error {
 	return nil
 }
 
-// HashToken returns the hex-encoded SHA-256 hash of the given raw token.
 func HashToken(raw string) string {
 	hash := sha256.Sum256([]byte(raw))
 

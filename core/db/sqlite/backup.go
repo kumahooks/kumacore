@@ -8,14 +8,12 @@ import (
 	"modernc.org/sqlite"
 )
 
-// backuper is the online-backup interface satisfied by the modernc.org/sqlite
-// driver connection.
+// backuper is the online-backup interface satisfied by the modernc.org/sqlite driver connection.
 type backuper interface {
 	NewBackup(destinationURI string) (*sqlite.Backup, error)
 }
 
-// BackupTo writes a snapshot of database to destinationPath using the SQLite
-// online backup API.
+// BackupTo writes a snapshot of database to destinationPath using the SQLite online backup API.
 //
 // ref: https://www.sqlite.org/backup.html
 func BackupTo(ctx context.Context, database *sql.DB, destinationPath string) error {

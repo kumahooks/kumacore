@@ -9,7 +9,7 @@ import (
 )
 
 func renderGitIgnore() string {
-	return ".agent/*\ndata/*\n"
+	return ".agent/*\ndata/*\nbackup/*\ntmp/*\nserver\n"
 }
 
 func renderReadme(options Options) string {
@@ -95,8 +95,8 @@ func moduleHasPageTemplates(moduleID string) (bool, error) {
 
 func renderJobImports() string {
 	return joinSectionLines([]string{
-		`	jobslogging "kumacore/app/jobs/logging"`,
 		`	"kumacore/app/jobs/backup"`,
+		`	"kumacore/app/jobs/logging"`,
 	})
 }
 
@@ -148,6 +148,9 @@ func renderModuleImports(metadata RepoMetadata) string {
 			)
 		case "health":
 			moduleImports = append(moduleImports, moduleImport{
+				path: "kumacore/app/migrations",
+				line: `	"kumacore/app/migrations"`,
+			}, moduleImport{
 				path: "kumacore/app/modules/health",
 				line: `	healthmodule "kumacore/app/modules/health"`,
 			})
@@ -188,14 +191,15 @@ func renderModuleSetup(metadata RepoMetadata) string {
 				`	if err != nil {`,
 				`		return moduleBootstrap{}, err`,
 				`	}`,
-				`	authHandler := authmodule.NewHandler(renderer, authService, configuration.Core.App.Dev)`,
+				`	secureCookie := !configuration.Core.App.Dev`,
+				`	authHandler := authmodule.NewHandler(renderer, authService, secureCookie)`,
 			)
 		case "health":
 			setupLines = append(setupLines,
 				`	healthHandler := healthmodule.NewHandler(`,
 				`		appDatabase,`,
 				`		appDialect,`,
-				`		newAppMigrationSource(),`,
+				`		migrations.AppSource(),`,
 				`	)`,
 			)
 		}
@@ -239,7 +243,7 @@ func renderJobRegistrations() string {
 		`				Name:     "logging:cleanup",`,
 		`				Interval: 24 * time.Hour,`,
 		`				Run: func(ctx context.Context, _ any) error {`,
-		`					return jobslogging.Cleanup(ctx, configuration.Core.Logging.Dir)`,
+		`					return logging.Cleanup(ctx, configuration.Core.Logging.Dir)`,
 		`				},`,
 		`			},`,
 		`			{`,

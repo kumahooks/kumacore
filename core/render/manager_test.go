@@ -385,6 +385,7 @@ func TestRenderErrorHTMXHistoryRestoreRequestRendersFullPage(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/errorscreen", nil)
 	request.Header.Set("HX-Request-Type", "full")
+	request.Header.Set("HX-History-Restore-Request", "true")
 
 	manager.RenderError(recorder, request, http.StatusNotFound, "ls")
 

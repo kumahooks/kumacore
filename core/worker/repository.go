@@ -40,7 +40,15 @@ func (repository *SQLQueueRepository) Enqueue(
 	payload *string,
 	createdAtUnix int64,
 ) error {
-	_, err := repository.database.ExecContext(ctx, enqueueJobQuery, id, name, payload, createdAtUnix, createdAtUnix)
+	_, err := repository.database.ExecContext(
+		ctx,
+		enqueueJobQuery,
+		id,
+		name,
+		payload,
+		createdAtUnix,
+		createdAtUnix,
+	)
 
 	return err
 }

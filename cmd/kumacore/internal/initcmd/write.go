@@ -250,12 +250,16 @@ func renderGoMod(projectName string) ([]byte, error) {
 
 func plannedProjectFiles(options Options) ([]fileChange, error) {
 	selectedPaths := []string{
+		".air.toml",
+		"LICENSE",
 		"core",
+		"app/jobs/backup",
 		"app/jobs/logging",
 		"app/migrations/embed.go",
 		"app/migrations/source.go",
 		"app/migrations/sqlite/worker",
 		"app/modules/errorscreen",
+		"app/repositories/repositories.go",
 		"app/testing",
 		"app/web",
 	}
@@ -270,7 +274,6 @@ func plannedProjectFiles(options Options) ([]fileChange, error) {
 				"app/middleware/auth",
 				"app/repositories/auth",
 				"app/services/auth",
-				"app/repositories/repositories.go",
 				"app/migrations/sqlite/app/0001_create_auth_tables.sql",
 			)
 		case "health":

@@ -22,14 +22,8 @@ import (
 )
 
 const (
-	// appRootDirectory is the template filesystem root, relative to APP_ROOT_DIR.
-	appRootDirectory = "app"
-	// defaultStaticDirectory is disk-relative to APP_ROOT_DIR.
-	defaultStaticDirectory = "app/web/static"
-	// defaultMigrationDirectory is relative to the template filesystem root.
+	appRootDirectory          = "app"
 	defaultMigrationDirectory = "migrations/sqlite/app"
-	// DefaultErrorTemplatePath is the page template used by RenderError, relative to the template filesystem root.
-	DefaultErrorTemplatePath = "modules/errorscreen/errorscreen.html"
 )
 
 type WorkerRuntime interface {
@@ -40,19 +34,17 @@ type WorkerRuntime interface {
 }
 
 type Options struct {
-	Configuration *config.Config
-	Database      *sql.DB
-	Dialect       dialect.Dialect
-	// Caller must not mutate these slices after passing to New.
-	Middleware        []func(http.Handler) http.Handler
-	Routes            []httpx.RouteRegistrar
-	Jobs              []worker.Job
-	FileSystem        fs.FS
-	StaticDir         string
-	ErrorTemplatePath string
-	MigrationSource   migrate.Source
-	Renderer          render.Renderer
-	WorkerRuntime     WorkerRuntime
+	Configuration   *config.Config
+	Database        *sql.DB
+	Dialect         dialect.Dialect
+	Middleware      []func(http.Handler) http.Handler
+	Routes          []httpx.RouteRegistrar
+	Jobs            []worker.Job
+	FileSystem      fs.FS
+	StaticDir       string
+	MigrationSource migrate.Source
+	Renderer        render.Renderer
+	WorkerRuntime   WorkerRuntime
 }
 
 type App struct {
@@ -87,19 +79,7 @@ func New(options Options) (*App, error) {
 		fileSystem = os.DirFS(filepath.Join(options.Configuration.App.RootDir, appRootDirectory))
 	}
 
-	staticDir := options.StaticDir
-	if staticDir == "" {
-		staticDir = filepath.Join(options.Configuration.App.RootDir, defaultStaticDirectory)
-	}
-
-	errorTemplatePath := options.ErrorTemplatePath
-	if errorTemplatePath == "" {
-		errorTemplatePath = DefaultErrorTemplatePath
-	}
-
 	options.FileSystem = fileSystem
-	options.StaticDir = staticDir
-	options.ErrorTemplatePath = errorTemplatePath
 
 	return &App{
 		options: options,

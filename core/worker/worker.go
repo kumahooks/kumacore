@@ -18,9 +18,8 @@ import (
 	"kumacore/core/db/migrate"
 )
 
-// Job describes a unit of work the Runtime can execute.
-// If Interval > 0 the job runs on a timer; if Interval == 0 it must be enqueued via Runtime.Enqueue and is executed
-// by the poll loop.
+// Job describes a unit of work the Runtime can execute. If Interval > 0 the job runs on a timer. If Interval == 0 it
+// must be enqueued via Runtime.Enqueue and is executed by the poll loop.
 type Job struct {
 	Name     string
 	Interval time.Duration
@@ -153,8 +152,7 @@ func (runtime *Runtime) Start(ctx context.Context) {
 	})
 }
 
-// Close cancels the runtime, waits for running jobs to finish, then
-// closes the dedicated worker database.
+// Close cancels the runtime, waits for running jobs to finish, and closes the database.
 func (runtime *Runtime) Close() error {
 	if runtime.database == nil {
 		return nil
@@ -347,8 +345,8 @@ func (runtime *Runtime) executeQueued(ctx context.Context, record jobRecord) {
 	}
 }
 
-// runJob runs the job on its Interval ticker. The first run fires one Interval after Start, not immediately, so a
-// server restart does not trigger a burst of scheduled jobs all at once.
+// runJob runs the job on its Interval ticker. The first run fires one Interval after Start, not immediately, so a server
+// restart does not trigger a burst of scheduled jobs all at once.
 func runJob(ctx context.Context, job Job) {
 	ticker := time.NewTicker(job.Interval)
 	defer ticker.Stop()

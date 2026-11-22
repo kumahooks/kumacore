@@ -14,7 +14,6 @@ import (
 
 	"kumacore/core/httpx"
 	logx "kumacore/core/log"
-	"kumacore/core/render"
 )
 
 // Initialize builds the template manager, runs migrations, and wires middleware and routes.
@@ -52,28 +51,7 @@ func (application *App) Initialize(ctx context.Context) error {
 		}
 	}
 
-	if application.options.Renderer != nil {
-		application.runtime.renderer = application.options.Renderer
-	} else {
-		templateManager, err := render.NewManager(
-			application.options.Configuration.Core.App.Dev,
-			application.options.FileSystem,
-			application.options.ErrorTemplatePath,
-		)
-		if err != nil {
-			application.close()
-			return fmt.Errorf("[app:Initialize] initialize renderer: %w", err)
-		}
-
-		application.runtime.renderer = templateManager
-	}
-
-	slog.Info(
-		"templates initialized",
-		slog.String("caller", "app:Initialize"),
-		slog.Bool("dev", application.options.Configuration.Core.App.Dev),
-	)
-
+	application.runtime.renderer = application.options.Renderer
 	application.runtime.router = application.newRouter(application.options.Middleware)
 
 	httpx.RegisterStatic(application.runtime.router, application.options.StaticDir)

@@ -1,4 +1,8 @@
 {{define "page-content"}}
+{{/* HTMX scans response fragments for <title> and swaps it into <head>.
+This is the mechanism for updating the document title during partial page
+navigation. Placing <title> inside <body> is a WHATWG conformance error
+but is the simplest approach that works. See: https://htmx.org/docs/#swap-options */}}
 <title>{{.Title}}</title>
 
 <div class="page-content page-content--home">

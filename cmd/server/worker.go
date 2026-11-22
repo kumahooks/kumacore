@@ -3,38 +3,27 @@ package main
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"path/filepath"
 	"time"
 
 	// kumacore:begin jobs-imports
 	"kumacore/app/jobs/backup"
-	jobslogging "kumacore/app/jobs/logging"
+	"kumacore/app/jobs/logging"
 	// kumacore:end jobs-imports
 
+	"kumacore/app/migrations"
 	"kumacore/core/config"
 	"kumacore/core/worker"
 )
 
 type workerBootstrap struct {
-	runtime  *worker.Runtime
-	jobs     []worker.Job
-	enqueuer dispatchRunner
-}
-
-type dispatchRunner interface {
-	Enqueue(jobName string, payload any) error
-}
-
-type noopDispatchRunner struct{}
-
-func (noopDispatchRunner) Enqueue(_ string, _ any) error {
-	return nil
+	runtime *worker.Runtime
+	jobs    []worker.Job
 }
 
 func buildWorkerBootstrap(configuration *config.Config, appDatabase *sql.DB) (workerBootstrap, error) {
 	if !configuration.Core.Worker.Enabled {
-		return workerBootstrap{jobs: []worker.Job{}, enqueuer: noopDispatchRunner{}}, nil
+		return workerBootstrap{jobs: []worker.Job{}}, nil
 	}
 
 	workerDatabase, workerDialect, err := openWorkerDatabase(configuration)
@@ -51,7 +40,7 @@ func buildWorkerBootstrap(configuration *config.Config, appDatabase *sql.DB) (wo
 			Name:     "logging:cleanup",
 			Interval: 24 * time.Hour,
 			Run: func(ctx context.Context, _ any) error {
-				return jobslogging.Cleanup(ctx, configuration.Core.Logging.Dir)
+				return logging.Cleanup(ctx, configuration.Core.Logging.Dir)
 			},
 		},
 		{
@@ -81,17 +70,16 @@ func buildWorkerBootstrap(configuration *config.Config, appDatabase *sql.DB) (wo
 	runtime, err := worker.NewRuntime(
 		workerDatabase,
 		workerDialect,
-		newWorkerMigrationSource(),
+		migrations.WorkerSource(),
 		configuration.Core.Worker.PollInterval,
 		configuration.Core.Worker.MaxAttempts,
 	)
 	if err != nil {
-		return workerBootstrap{}, fmt.Errorf("[server:buildWorkerBootstrap] create worker runtime: %w", err)
+		return workerBootstrap{}, err
 	}
 
 	return workerBootstrap{
-		runtime:  runtime,
-		jobs:     jobs,
-		enqueuer: runtime,
+		runtime: runtime,
+		jobs:    jobs,
 	}, nil
 }

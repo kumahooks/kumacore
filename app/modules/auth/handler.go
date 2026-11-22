@@ -1,4 +1,4 @@
-// Package auth implements a login page and auth service
+// Package auth implements the login, logout, and session management handlers.
 package auth
 
 import (
@@ -8,13 +8,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"kumacore/app/middleware/auth"
-	"kumacore/app/services/auth"
+	authmiddleware "kumacore/app/middleware/auth"
+	authservice "kumacore/app/services/auth"
 	"kumacore/core/httpx"
 	"kumacore/core/render"
 )
 
-// Handler handles login, logout, and authenticated user status requests.
+// Handler handles login, logout, and session creation.
 type Handler struct {
 	renderer     render.Renderer
 	authService  *authservice.Service
@@ -22,21 +22,27 @@ type Handler struct {
 }
 
 // NewHandler returns a Handler backed by the given auth service and renderer.
-func NewHandler(renderer render.Renderer, authenticationService *authservice.Service, isDevelopment bool) *Handler {
+func NewHandler(
+	renderer render.Renderer,
+	authService *authservice.Service,
+	secureCookie bool,
+) *Handler {
 	return &Handler{
 		renderer:     renderer,
-		authService:  authenticationService,
-		secureCookie: !isDevelopment,
+		authService:  authService,
+		secureCookie: secureCookie,
 	}
 }
 
-// Routes registers auth routes on the given router.
+// Routes registers the login, logout, and session creation routes on the given router.
 func Routes(handler *Handler) func(chi.Router) {
 	return func(router chi.Router) {
+		// Public
 		router.Get("/auth", handler.Login)
 		router.Post("/auth", handler.Authenticate)
-		router.Post("/auth/logout", handler.Logout)
 
+		// Authenticated
+		router.With(authmiddleware.RequireAuth(handler.authService)).Post("/auth/logout", handler.Logout)
 		router.With(authmiddleware.RequireAuth(handler.authService)).Get("/auth/me", handler.Me)
 	}
 }
@@ -58,7 +64,6 @@ func (handler *Handler) Authenticate(writer http.ResponseWriter, request *http.R
 
 	username := request.FormValue("username")
 	password := request.FormValue("password")
-
 	if username == "" || password == "" {
 		writer.WriteHeader(http.StatusForbidden)
 		handler.renderLogin(writer, request, "invalid credentials")
@@ -71,7 +76,6 @@ func (handler *Handler) Authenticate(writer http.ResponseWriter, request *http.R
 		if errors.Is(err, authservice.ErrInvalidCredentials) {
 			writer.WriteHeader(http.StatusForbidden)
 			handler.renderLogin(writer, request, "invalid credentials")
-
 			return
 		}
 
@@ -88,11 +92,10 @@ func (handler *Handler) Authenticate(writer http.ResponseWriter, request *http.R
 	}
 
 	httpx.SetCookie(writer, "session", rawToken, expiresAt, handler.secureCookie)
-
 	http.Redirect(writer, request, "/auth/me", http.StatusSeeOther)
 }
 
-// Logout deletes the session, clears the cookie, and redirects to /.
+// Logout deletes the session cookie and redirects to the login page.
 func (handler *Handler) Logout(writer http.ResponseWriter, request *http.Request) {
 	sessionCookie, err := request.Cookie("session")
 	if err == nil {
@@ -107,7 +110,14 @@ func (handler *Handler) Logout(writer http.ResponseWriter, request *http.Request
 
 	httpx.ClearCookie(writer, "session", handler.secureCookie)
 
-	http.Redirect(writer, request, "/", http.StatusSeeOther)
+	if request.Header.Get("HX-Request-Type") == "partial" {
+		writer.Header().Set("HX-Redirect", "/auth")
+		writer.WriteHeader(http.StatusOK)
+
+		return
+	}
+
+	http.Redirect(writer, request, "/auth", http.StatusSeeOther)
 }
 
 // Me renders the authenticated user status page.
@@ -128,6 +138,7 @@ func (handler *Handler) Me(writer http.ResponseWriter, request *http.Request) {
 	}
 }
 
+// renderLogin renders the login form with an optional error message.
 func (handler *Handler) renderLogin(writer http.ResponseWriter, request *http.Request, errorMessage string) {
 	pageFile := "modules/auth/auth.html"
 	data := map[string]any{"Title": "auth"}

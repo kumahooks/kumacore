@@ -1,4 +1,9 @@
 {{define "navbar"}}
-<header class="navbar" hx-target:inherited="#content" hx-push-url:inherited="true">
-</header>
+<nav class="navbar" aria-label="site" hx-target:inherited="#content" hx-push-url:inherited="true">
+	<a href="/" hx-get="/">home</a>
+
+	{{if .User}}
+	<a href="/auth/me" hx-boost="false">me</a>
+	{{end}}
+</nav>
 {{end}}

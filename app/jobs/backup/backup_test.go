@@ -22,8 +22,8 @@ func TestMain(testingMain *testing.M) {
 	os.Exit(db.NewTemplate(testingMain, &databaseTemplate))
 }
 
-// newDatabaseToBackup returns a fresh on-disk SQLite database with a marker
-// table seeded with marker, so the snapshot has something to verify against.
+// newDatabaseToBackup returns a fresh on-disk SQLite database with a marker table seeded with marker, so the snapshot
+// has something to verify against.
 func newDatabaseToBackup(t *testing.T, marker string) *sql.DB {
 	t.Helper()
 
@@ -74,9 +74,8 @@ func hasZipEntry(t *testing.T, zipPath string, name string) bool {
 	return false
 }
 
-// snapshotHasMarker opens the entry named "app.db" or "worker.db" inside the
-// zip, copies it to a temp file, opens it as SQLite, and checks the marker
-// table contains the expected value.
+// snapshotHasMarker opens the entry named "app.db" or "worker.db" inside the zip, copies it to a temp file, opens it
+// as SQLite, and checks the marker table contains the expected value.
 func snapshotHasMarker(t *testing.T, zipPath string, entryName string, expectedMarker string) {
 	t.Helper()
 
@@ -133,8 +132,8 @@ func snapshotHasMarker(t *testing.T, zipPath string, entryName string, expectedM
 	}
 }
 
-// setupDataDir creates a temp directory mimicking /data/ with the db files,
-// sqlite internal files, a log file, and a nested noise attachment.
+// setupDataDir creates a temp directory mimicking /data/ with the db files, sqlite internal files, a log file, and a
+// nested noise attachment.
 func setupDataDir(t *testing.T) string {
 	t.Helper()
 
@@ -195,8 +194,7 @@ func TestRun_CreatesBackupZip_WithSnapshotsAndFiles(t *testing.T) {
 
 	zipPath := filepath.Join(backupDir, entries[0].Name())
 
-	// The zip must contain the app snapshot, the worker snapshot, and the
-	// real data files, but not the raw db/wal/shm/zip files.
+	// The zip must contain the app snapshot, the worker snapshot, and the real data files, but not the raw db/wal/shm/zip files.
 	if !hasZipEntry(t, zipPath, "app.db") {
 		t.Error("zip must contain app.db snapshot")
 	}
@@ -219,8 +217,7 @@ func TestRun_CreatesBackupZip_WithSnapshotsAndFiles(t *testing.T) {
 		t.Error("zip must not contain raw db sidecar files")
 	}
 
-	// The snapshots must be real, restorable SQLite databases carrying the
-	// marker rows from the live databases.
+	// The snapshots must be real, restorable SQLite databases carrying the marker rows from the live databases.
 	snapshotHasMarker(t, zipPath, "app.db", "app-marker")
 	snapshotHasMarker(t, zipPath, "worker.db", "worker-marker")
 }
@@ -264,8 +261,8 @@ func TestRun_PrunesOldDailyBackups(t *testing.T) {
 	dataDir := t.TempDir()
 	backupDir := t.TempDir()
 
-	// Seed four old daily backups: 10, 9, 8, 7 days ago. All are 4+ days old,
-	// so all four should be pruned after a new one is created.
+	// Seed four old daily backups: 10, 9, 8, 7 days ago. All are 4+ days old, so all four should be pruned after a new one
+	// is created.
 	now := time.Now().UTC()
 	for _, daysAgo := range []int{10, 9, 8, 7} {
 		name := "backup_" + now.AddDate(0, 0, -daysAgo).Format("20060102") + "_daily.zip"
@@ -337,8 +334,7 @@ func TestRun_DailyAndWeekly_AreIndependent(t *testing.T) {
 	backupDir := t.TempDir()
 
 	now := time.Now().UTC()
-	// A 10-day-old weekly backup is within the 4-week retention window and
-	// must NOT be pruned by the daily run.
+	// A 10-day-old weekly backup is within the 4-week retention window and must NOT be pruned by the daily run.
 	weeklyName := "backup_" + now.AddDate(0, 0, -10).Format("20060102") + "_weekly.zip"
 	writeFile(t, backupDir, weeklyName, "weekly")
 
@@ -388,13 +384,13 @@ func TestCleanup_EnforcesCountRetention(t *testing.T) {
 	backupDir := t.TempDir()
 
 	now := time.Now().UTC()
-	// Seed 4 daily backups (all within the date window), cleanup must keep the 3 newest and delete the oldest.
+	// Seed 4 daily backups (all within the date window). Cleanup must keep the 3 newest and delete the oldest.
 	for _, daysAgo := range []int{3, 2, 1, 0} {
 		name := "backup_" + now.AddDate(0, 0, -daysAgo).Format("20060102") + "_daily.zip"
 		writeFile(t, backupDir, name, "daily")
 	}
 
-	// Seed 2 weekly backups, both must survive.
+	// Seed 2 weekly backups. Both must survive.
 	for _, weeksAgo := range []int{1, 0} {
 		name := "backup_" + now.AddDate(0, 0, -weeksAgo*7).Format("20060102") + "_weekly.zip"
 		writeFile(t, backupDir, name, "weekly")

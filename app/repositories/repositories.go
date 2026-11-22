@@ -1,4 +1,4 @@
-// Package repositories contains shared repository helpers.
+// Package repositories provides shared utilities for SQL repositories.
 package repositories
 
 import (
@@ -6,7 +6,7 @@ import (
 	"io/fs"
 )
 
-// MustReadQuery reads a SQL query file from fileSystem and panics if it cannot be read.
+// MustReadQuery reads an embedded SQL file at init time and panics on failure.
 func MustReadQuery(fileSystem fs.FS, name string) string {
 	queryBytes, err := fs.ReadFile(fileSystem, name)
 	if err != nil {

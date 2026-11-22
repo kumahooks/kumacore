@@ -1,8 +1,7 @@
 // Package testfactory provides record creation helpers for tests.
 //
-// Each Create* function inserts one row with sensible defaults for zero-valued
-// fields. Functions accept driver.DBTX so they work with both *sql.DB and
-// *sql.Tx.
+// Each Create* function inserts one row with sensible defaults for zero-valued fields. Functions accept driver.DBTX so
+// they work with both *sql.DB and *sql.Tx.
 package testfactory
 
 import (

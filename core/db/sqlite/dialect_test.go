@@ -1,16 +1,12 @@
-package sqlite_test
+package sqlite
 
-import (
-	"testing"
-
-	"kumacore/core/db/sqlite"
-)
+import "testing"
 
 func TestDialect(t *testing.T) {
-	databaseDialect := sqlite.Dialect{}
+	databaseDialect := Dialect{}
 
-	if databaseDialect.Name() != sqlite.DriverName {
-		t.Errorf("Name: got %q, want %q", databaseDialect.Name(), sqlite.DriverName)
+	if databaseDialect.Name() != DriverName {
+		t.Errorf("Name: got %q, want %q", databaseDialect.Name(), DriverName)
 	}
 
 	if databaseDialect.Placeholder(1) != "?" {
@@ -18,6 +14,10 @@ func TestDialect(t *testing.T) {
 	}
 
 	if databaseDialect.CurrentUnixTimestampExpression() != "unixepoch()" {
-		t.Errorf("CurrentUnixTimestampExpression: got %q, want %q", databaseDialect.CurrentUnixTimestampExpression(), "unixepoch()")
+		t.Errorf(
+			"CurrentUnixTimestampExpression: got %q, want %q",
+			databaseDialect.CurrentUnixTimestampExpression(),
+			"unixepoch()",
+		)
 	}
 }

@@ -1,17 +1,15 @@
-package sqlite_test
+package sqlite
 
 import (
 	"context"
-	"database/sql"
 	"path/filepath"
 	"testing"
 
 	"kumacore/core/db/driver"
-	"kumacore/core/db/sqlite"
 )
 
 func TestOpen_Succeeds(t *testing.T) {
-	database, err := sqlite.Open(":memory:")
+	database, err := Open(":memory:")
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -20,7 +18,7 @@ func TestOpen_Succeeds(t *testing.T) {
 }
 
 func TestOpen_FileDatabase_UsesWALMode(t *testing.T) {
-	database, err := sqlite.Open(filepath.Join(t.TempDir(), "test.db"))
+	database, err := Open(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -37,7 +35,7 @@ func TestOpen_FileDatabase_UsesWALMode(t *testing.T) {
 }
 
 func TestOpen_ForeignKeysEnabled(t *testing.T) {
-	database, err := sqlite.Open(":memory:")
+	database, err := Open(":memory:")
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -60,7 +58,7 @@ func TestOpen_ForeignKeysEnabled(t *testing.T) {
 }
 
 func TestOpen_BusyTimeoutConfigured(t *testing.T) {
-	database, err := sqlite.Open(filepath.Join(t.TempDir(), "test.db"))
+	database, err := Open(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -77,7 +75,7 @@ func TestOpen_BusyTimeoutConfigured(t *testing.T) {
 }
 
 func TestOpen_MemoryDatabase_UsesSingleConnection(t *testing.T) {
-	database, err := sqlite.Open(":memory:")
+	database, err := Open(":memory:")
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -104,7 +102,7 @@ func TestOpen_MemoryDatabase_UsesSingleConnection(t *testing.T) {
 }
 
 func TestOpen_ReturnsDBTXCompatibleDatabase(t *testing.T) {
-	database, err := sqlite.Open(":memory:")
+	database, err := Open(":memory:")
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -114,7 +112,7 @@ func TestOpen_ReturnsDBTXCompatibleDatabase(t *testing.T) {
 }
 
 func TestTransaction_IsDBTXCompatible(t *testing.T) {
-	database, err := sqlite.Open(":memory:")
+	database, err := Open(":memory:")
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -137,7 +135,38 @@ func assertDBTX(t *testing.T, database driver.DBTX) {
 	}
 }
 
-var (
-	_ driver.DBTX = (*sql.DB)(nil)
-	_ driver.DBTX = (*sql.Tx)(nil)
-)
+func TestBackupTo_CreatesConsistentSnapshot(t *testing.T) {
+	source, err := Open(filepath.Join(t.TempDir(), "source.db"))
+	if err != nil {
+		t.Fatalf("open source: %v", err)
+	}
+	defer source.Close()
+
+	if _, err = source.Exec("CREATE TABLE marker(value TEXT)"); err != nil {
+		t.Fatalf("create marker table: %v", err)
+	}
+
+	if _, err = source.Exec("INSERT INTO marker VALUES ('lain')"); err != nil {
+		t.Fatalf("insert marker: %v", err)
+	}
+
+	destinationPath := filepath.Join(t.TempDir(), "snapshot.db")
+	if err = BackupTo(context.Background(), source, destinationPath); err != nil {
+		t.Fatalf("BackupTo: %v", err)
+	}
+
+	destination, err := Open(destinationPath)
+	if err != nil {
+		t.Fatalf("open snapshot: %v", err)
+	}
+	defer destination.Close()
+
+	var value string
+	if err := destination.QueryRow("SELECT value FROM marker").Scan(&value); err != nil {
+		t.Fatalf("query marker: %v", err)
+	}
+
+	if value != "lain" {
+		t.Errorf("marker: got %q, want %q", value, "lain")
+	}
+}

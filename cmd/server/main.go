@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	kumacoreapp "kumacore/app"
+	"kumacore/app/migrations"
 	"kumacore/core/app"
 	"kumacore/core/config"
 	"kumacore/core/render"
@@ -31,7 +32,7 @@ func main() {
 		fileSystem = kumacoreapp.Templates
 	}
 
-	renderer, err := render.NewManager(configuration.Core.App.Dev, fileSystem, app.DefaultErrorTemplatePath)
+	renderer, err := render.NewManager(configuration.Core.App.Dev, fileSystem, "modules/errorscreen/errorscreen.html")
 	if err != nil {
 		log.Fatalf("[server:main] initialize renderer: %v", err)
 	}
@@ -43,10 +44,10 @@ func main() {
 
 	workerRuntime, err := buildWorkerBootstrap(configuration, appDatabase)
 	if err != nil {
-		log.Fatalf("[server:main] build worker bootstrap: %v", err)
+		log.Fatalf("[server:main] build worker runtime: %v", err)
 	}
 
-	modules, err := buildModules(configuration, fileSystem, renderer, appDatabase, appDialect, workerRuntime.enqueuer)
+	modules, err := buildModules(configuration, renderer, appDatabase, appDialect)
 	if err != nil {
 		log.Fatalf("[server:main] build modules: %v", err)
 	}
@@ -60,7 +61,7 @@ func main() {
 		Jobs:            workerRuntime.jobs,
 		FileSystem:      fileSystem,
 		StaticDir:       configuration.App.Static.Dir,
-		MigrationSource: newAppMigrationSource(),
+		MigrationSource: migrations.AppSource(),
 		Renderer:        renderer,
 	}
 
@@ -73,11 +74,11 @@ func main() {
 		log.Fatalf("[server:main] create app: %v", err)
 	}
 
-	if err := application.Initialize(context.Background()); err != nil {
+	if err = application.Initialize(context.Background()); err != nil {
 		log.Fatalf("[server:main] initialize app: %v", err)
 	}
 
-	if err := application.Start(application.Address()); err != nil {
+	if err = application.Start(application.Address()); err != nil {
 		slog.Error(
 			"start app",
 			slog.String("caller", "server:main"),

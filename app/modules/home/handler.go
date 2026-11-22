@@ -33,13 +33,14 @@ func Routes(handler *Handler) func(chi.Router) {
 func (handler *Handler) Index(writer http.ResponseWriter, request *http.Request) {
 	pageFile := "modules/home/home.html"
 	data := map[string]any{
-		"Title":           handler.applicationName,
-		"ApplicationName": handler.applicationName,
+		"Title":   handler.applicationName,
+		"AppName": handler.applicationName,
 	}
 
 	if err := handler.renderer.Render(writer, request, pageFile, "page-content", data); err != nil {
 		slog.ErrorContext(
-			request.Context(), "render",
+			request.Context(),
+			"render",
 			slog.String("caller", "home:Index"),
 			slog.Any("err", err),
 		)

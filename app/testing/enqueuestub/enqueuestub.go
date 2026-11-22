@@ -1,6 +1,5 @@
-// Package enqueuestub provides a test double for the dispatch enqueuer
-// interface. It records the last job name and payload, and counts calls,
-// so handler tests can assert dispatch behavior without a running worker.
+// Package enqueuestub provides a test double for the dispatch enqueuer interface. It records the last job name and
+// payload, and counts calls, so handler tests can assert dispatch behavior without a running worker.
 package enqueuestub
 
 // Stub records enqueue calls for assertion in tests.

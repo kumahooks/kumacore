@@ -8,8 +8,10 @@ import (
 )
 
 const contentSecurityPolicy = "default-src 'self'; object-src 'none'; base-uri 'none'; " +
-	"form-action 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; " +
-	"script-src 'self'; img-src 'self'"
+	"form-action 'self'; style-src 'self' " +
+	"'sha256-faU7yAF8NxuMTNEwVmBz+VcYeIoBQ2EMHW3WaVxCvnk=' " +
+	"'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='; " +
+	"style-src-attr 'unsafe-inline'; script-src 'self'; img-src 'self'"
 
 // Middleware sets security-related response headers on every request.
 func Middleware(next http.Handler) http.Handler {

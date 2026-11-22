@@ -1,5 +1,5 @@
-// Package dispatch provides a work dispatcher for triggering background jobs
-// from within module handlers without direct coupling to the worker package.
+// Package dispatch provides a work dispatcher for triggering background jobs from within module handlers without direct
+// coupling to the worker package.
 package dispatch
 
 type enqueuer interface {
@@ -24,6 +24,7 @@ func New(runner enqueuer) *Dispatcher {
 	return &Dispatcher{runner: runner}
 }
 
+// Dispatch enqueues a background job.
 func (dispatcher *Dispatcher) Dispatch(jobName string, payload any) error {
 	return dispatcher.runner.Enqueue(jobName, payload)
 }

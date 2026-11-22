@@ -111,7 +111,7 @@ func newStaticFileHandler(staticDir string) http.HandlerFunc {
 		if responseHeader.Get("Content-Type") == "" {
 			mimeType := mime.TypeByExtension(filepath.Ext(filePath))
 			if mimeType == "" {
-				// Go will sniff the content-type: https://www.youtube.com/watch?v=8t8JYpt0egE
+				// avoid sniffing the content-type: https://www.youtube.com/watch?v=8t8JYpt0egE
 				responseHeader["Content-Type"] = nil
 			} else {
 				responseHeader.Set("Content-Type", mimeType)

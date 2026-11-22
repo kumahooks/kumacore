@@ -3,13 +3,14 @@
 	align-items: center;
 	justify-content: center;
 	height: 100vh;
+	height: 100dvh;
 }
 
 .auth-card {
-	border: 1px solid #2a2a2a;
+	border: 1px solid var(--color-border-panel);
 	padding: 2rem;
 	width: 280px;
-	background: #0d0d0d;
+	background: var(--color-surface-1);
 }
 
 .auth-header {
@@ -20,19 +21,17 @@
 }
 
 .auth-title {
-	font-family: monospace;
 	font-size: 1rem;
-	color: #ad7084;
+	color: var(--color-accent-deep);
 }
 
 .auth-title-slash {
-	color: #b0a482;
+	color: var(--color-text-primary);
 }
 
 .auth-error {
-	font-family: monospace;
 	font-size: 0.875rem;
-	color: #d80000;
+	color: var(--color-accent-danger);
 	margin-bottom: 1rem;
 }
 
@@ -43,10 +42,9 @@
 }
 
 .auth-input {
-	background: #000;
-	border: 1px solid #2a2a2a;
-	color: #b0a482;
-	font-family: monospace;
+	background: var(--color-bg);
+	border: 1px solid var(--color-border-panel);
+	color: var(--color-text-primary);
 	font-size: 0.93rem;
 	padding: 0.4rem 0.6rem;
 	outline: none;
@@ -54,14 +52,13 @@
 }
 
 .auth-input:focus {
-	border-color: #ad7084;
+	border-color: var(--color-accent-deep);
 }
 
 .auth-submit {
 	background: none;
-	border: 1px solid #2a2a2a;
-	color: #b0a482;
-	font-family: monospace;
+	border: 1px solid var(--color-border-panel);
+	color: var(--color-text-primary);
 	font-size: 0.93rem;
 	padding: 0.4rem;
 	cursor: pointer;
@@ -71,14 +68,18 @@
 }
 
 .auth-submit:hover {
-	border-color: #ad7084;
-	color: #ad7084;
+	border-color: var(--color-accent-deep);
+	color: var(--color-accent-deep);
+}
+
+.auth-submit:focus {
+	outline: 1px solid var(--color-accent-deep);
+	outline-offset: 2px;
 }
 
 .auth-back {
-	font-family: monospace;
 	font-size: 0.875rem;
-	color: #b8748a;
+	color: var(--color-accent-interactive);
 	text-decoration: none;
 	min-height: 24px;
 	display: inline-flex;
@@ -86,7 +87,7 @@
 }
 
 .auth-back:hover {
-	color: #b0a482;
+	color: var(--color-text-primary);
 	text-decoration: underline;
 }
 
@@ -95,14 +96,14 @@
 	align-items: center;
 	justify-content: center;
 	height: 100vh;
+	height: 100dvh;
 }
 
 .auth-me-text {
-	font-family: monospace;
 	font-size: 1rem;
-	color: #b0a482;
+	color: var(--color-text-primary);
 }
 
 .auth-me-username {
-	color: #b8748a;
+	color: var(--color-accent-interactive);
 }

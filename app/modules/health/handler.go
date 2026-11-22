@@ -122,9 +122,13 @@ func checkMigrations(
 	databaseDialect dialect.Dialect,
 	migrationSource migrate.Source,
 ) string {
-	_, err := migrate.Validate(ctx, databaseConnection, databaseDialect, migrationSource)
+	plan, err := migrate.Validate(ctx, databaseConnection, databaseDialect, migrationSource)
 	if err != nil {
-		return "pending or invalid"
+		return "invalid"
+	}
+
+	if plan.PendingCount() > 0 {
+		return "pending"
 	}
 
 	return "ok"

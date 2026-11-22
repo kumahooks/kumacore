@@ -3,5 +3,5 @@ package migrations
 
 import "embed"
 
-//go:embed sqlite/app/*.sql sqlite/worker/*.sql
+//go:embed all:sqlite/app all:sqlite/worker
 var Files embed.FS

@@ -1,9 +1,8 @@
 // Package cache provides a generic TTL-based in-memory cache.
 //
-// Entries expire lazily on Get: if an entry's expiration time has passed it is
-// treated as a miss and removed from the map. There is no background cleanup
-// goroutine, so expired entries that are never read again remain in memory
-// until explicit Purge or process exit.
+// Entries expire lazily on Get: if an entry's expiration time has passed it is treated as a miss and removed from the
+// map. There is no background cleanup goroutine, so expired entries that are never read again remain in memory until
+// explicit Purge or process exit.
 package cache
 
 import (
@@ -17,16 +16,14 @@ type cacheEntry[V any] struct {
 	expiresAt time.Time
 }
 
-// Cache is a map of keys to TTL-stamped values.
-// A zero TTL means entries never expire.
+// Cache is a map of keys to TTL-stamped values. A zero TTL means entries never expire.
 type Cache[K comparable, V any] struct {
 	mutex   sync.RWMutex
 	ttl     time.Duration
 	entries map[K]cacheEntry[V]
 }
 
-// NewCache returns a Cache whose entries expire after ttl.
-// If ttl is zero, entries never expire.
+// NewCache returns a Cache whose entries expire after ttl. If ttl is zero, entries never expire.
 func NewCache[K comparable, V any](ttl time.Duration) *Cache[K, V] {
 	return &Cache[K, V]{
 		ttl:     ttl,
@@ -34,8 +31,8 @@ func NewCache[K comparable, V any](ttl time.Duration) *Cache[K, V] {
 	}
 }
 
-// Get returns the cached value for key and true if it exists and has not expired.
-// Expired entries are removed lazily during this call.
+// Get returns the cached value for key and true if it exists and has not expired. Expired entries are removed lazily
+// during this call.
 func (cache *Cache[K, V]) Get(key K) (V, bool) {
 	cache.mutex.RLock()
 	cached, ok := cache.entries[key]
@@ -88,8 +85,8 @@ func (cache *Cache[K, V]) Purge() {
 	cache.mutex.Unlock()
 }
 
-// Len returns the number of entries currently in the map, including expired
-// entries that have not been lazily removed yet.
+// Len returns the number of entries currently in the map, including expired entries that have not been lazily removed
+// yet.
 func (cache *Cache[K, V]) Len() int {
 	cache.mutex.RLock()
 	defer cache.mutex.RUnlock()

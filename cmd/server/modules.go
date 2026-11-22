@@ -2,46 +2,38 @@ package main
 
 import (
 	"database/sql"
-	"io/fs"
 	"net/http"
-
-	"github.com/go-chi/chi/v5"
 
 	// kumacore:begin modules-imports
 	"golang.org/x/crypto/bcrypt"
 	authmiddleware "kumacore/app/middleware/auth"
+	"kumacore/app/migrations"
 	authmodule "kumacore/app/modules/auth"
 	"kumacore/app/modules/errorscreen"
 	healthmodule "kumacore/app/modules/health"
 	"kumacore/app/modules/home"
 	authrepository "kumacore/app/repositories/auth"
 	authservice "kumacore/app/services/auth"
+	"kumacore/core/cache"
 	// kumacore:end modules-imports
 
-	"kumacore/core/cache"
 	"kumacore/core/config"
 	"kumacore/core/db/dialect"
+	"kumacore/core/httpx"
 	"kumacore/core/render"
 )
 
 type moduleBootstrap struct {
 	middleware []func(http.Handler) http.Handler
-	routes     []func(chi.Router)
+	routes     []httpx.RouteRegistrar
 }
 
 func buildModules(
 	configuration *config.Config,
-	fileSystem fs.FS,
 	renderer render.Renderer,
 	appDatabase *sql.DB,
 	appDialect dialect.Dialect,
-	enqueuer dispatchRunner,
 ) (moduleBootstrap, error) {
-	_ = fileSystem
-	_ = appDatabase
-	_ = appDialect
-	_ = enqueuer
-
 	// kumacore:begin modules-setup
 	authRepository := authrepository.NewRepository(appDatabase)
 	userCache := cache.NewCache[string, authservice.CachedUser](configuration.Core.Session.CacheTTL)
@@ -55,14 +47,15 @@ func buildModules(
 		return moduleBootstrap{}, err
 	}
 
+	secureCookie := !configuration.Core.App.Dev
 	homeHandler := home.NewHandler(renderer, configuration.App.Name)
-	authHandler := authmodule.NewHandler(renderer, authService, configuration.Core.App.Dev)
+	authHandler := authmodule.NewHandler(renderer, authService, secureCookie)
 	notFoundHandler := errorscreen.NewHandler(renderer)
 
 	healthHandler := healthmodule.NewHandler(
 		appDatabase,
 		appDialect,
-		newAppMigrationSource(),
+		migrations.AppSource(),
 	)
 	// kumacore:end modules-setup
 
@@ -72,7 +65,7 @@ func buildModules(
 			authmiddleware.LoadAuth(authService),
 			// kumacore:end modules-middleware
 		},
-		routes: []func(chi.Router){
+		routes: []httpx.RouteRegistrar{
 			// kumacore:begin modules-routes
 			home.Routes(homeHandler),
 			authmodule.Routes(authHandler),

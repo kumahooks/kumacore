@@ -202,10 +202,9 @@ func TestGet_ConcurrentAccess_IsSafe(t *testing.T) {
 	}
 }
 
-// TestGet_ExpiredEntry_RacingWithSet_PreservesFreshEntry exercises the
-// double-check locking path in Get: an entry is expired under the RLock, but
-// a concurrent Set refreshes it before the write lock is acquired. The fresh
-// entry must survive.
+// TestGet_ExpiredEntry_RacingWithSet_PreservesFreshEntry exercises the double-check locking path in Get: an entry is
+// expired under the RLock, but a concurrent Set refreshes it before the write lock is acquired. The fresh entry must
+// survive.
 func TestGet_ExpiredEntry_RacingWithSet_PreservesFreshEntry(t *testing.T) {
 	cacheInstance := cache.NewCache[string, int](10 * time.Millisecond)
 

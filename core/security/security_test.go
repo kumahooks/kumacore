@@ -25,7 +25,7 @@ func TestSecurity_SetsContentSecurityPolicy(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/", nil))
 
-	want := "default-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; script-src 'self'; img-src 'self'"
+	want := "default-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; style-src 'self' 'sha256-faU7yAF8NxuMTNEwVmBz+VcYeIoBQ2EMHW3WaVxCvnk=' 'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='; style-src-attr 'unsafe-inline'; script-src 'self'; img-src 'self'"
 	if got := recorder.Header().Get("Content-Security-Policy"); got != want {
 		t.Errorf("Content-Security-Policy: got %q, want %q", got, want)
 	}

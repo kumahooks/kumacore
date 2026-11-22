@@ -3,8 +3,11 @@
 {{end}}
 
 {{define "page-content"}}
+{{/* HTMX scans response fragments for <title> and swaps it into <head>.
+This is the mechanism for updating the document title during partial page
+navigation. Placing <title> inside <body> is a WHATWG conformance error
+but is the simplest approach that works. See: https://htmx.org/docs/#swap-options */}}
 <title>{{.Title}}</title>
-<link rel="stylesheet" href="/static/modules/auth/auth.css">
 
 <div class="auth-container">
 	<div class="auth-card">
@@ -14,8 +17,11 @@
 		</div>
 
 		<form class="auth-form" method="POST" action="/auth" hx-boost="false">
-			<input class="auth-input" type="text" name="username" placeholder="username" autocomplete="username" autofocus>
-			<input class="auth-input" type="password" name="password" placeholder="password" autocomplete="current-password">
+			<label class="visually-hidden" for="auth-username">username</label>
+			<input id="auth-username" class="auth-input" type="text" name="username" placeholder="username" autocomplete="username" autofocus>
+
+			<label class="visually-hidden" for="auth-password">password</label>
+			<input id="auth-password" class="auth-input" type="password" name="password" placeholder="password" autocomplete="current-password">
 
 			{{if .Error}}
 			<p class="auth-error">{{.Error}}</p>

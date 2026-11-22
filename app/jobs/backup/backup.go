@@ -18,7 +18,7 @@ const maxRetainedPerSuffix = 3
 
 // Run creates a backup zip of dataDir in backupDir named with the current UTC date and the given suffix, then prunes
 // older backups of the same suffix past the retention age. appDatabase is always snapshotted. workerDatabase is snapshotted
-// when non-nil and skipped when nil (e.g. WORKER_ENABLED=false).
+// when non-nil and skipped when nil (e.g. CORE_WORKER_ENABLED=false).
 func Run(
 	ctx context.Context,
 	appDatabase *sql.DB,

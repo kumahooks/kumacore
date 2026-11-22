@@ -1,4 +1,4 @@
-// Package driver defines database interfaces used by stores and services.
+// Package driver defines the DBTX interface for database operations.
 package driver
 
 import (

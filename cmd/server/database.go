@@ -6,11 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"kumacore/app/migrations"
 	"kumacore/core/config"
 	"kumacore/core/db"
 	"kumacore/core/db/dialect"
-	"kumacore/core/db/migrate"
 )
 
 func openAppDatabase(configuration *config.Config) (*sql.DB, dialect.Dialect, error) {
@@ -43,12 +41,4 @@ func openWorkerDatabase(configuration *config.Config) (*sql.DB, dialect.Dialect,
 	}
 
 	return databaseConnection, databaseDialect, nil
-}
-
-func newAppMigrationSource() migrate.Source {
-	return migrations.AppSource()
-}
-
-func newWorkerMigrationSource() migrate.Source {
-	return migrations.WorkerSource()
 }
