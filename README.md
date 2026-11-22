@@ -45,7 +45,7 @@ Runtime-generated files live under `data/`.
 Startup is deterministic:
 
 1. load runtime config
-2. create the renderer from the app filesystem
+2. create the renderer from the app filesystem, parsing the error template at startup in production
 3. open the SQLite adapter
 4. construct repositories, services, middleware, handlers, and jobs explicitly
 5. validate and run migrations

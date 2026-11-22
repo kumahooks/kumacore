@@ -52,6 +52,7 @@ func (application *App) Initialize(ctx context.Context) error {
 		templateManager, err := render.NewManager(
 			application.options.Configuration.Core.App.Dev,
 			application.options.FileSystem,
+			application.options.ErrorTemplatePath,
 		)
 		if err != nil {
 			application.close()

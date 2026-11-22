@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -41,6 +42,8 @@ func renderAppEmbed(moduleIDs []string, projectName string) ([]byte, error) {
 	patterns := []string{
 		"web/templates/layouts/*.html",
 		"web/templates/components/*.html",
+		"modules/errorscreen/*.html",
+		"modules/*/components/*.html",
 	}
 
 	for _, moduleID := range normalizeModuleIDs(moduleIDs) {
@@ -90,7 +93,7 @@ func moduleHasPageTemplates(moduleID string) (bool, error) {
 	return false, nil
 }
 
-func renderJobImports(metadata RepoMetadata) string {
+func renderJobImports() string {
 	return joinSectionLines([]string{
 		`	jobslogging "kumacore/app/jobs/logging"`,
 		`	"kumacore/app/jobs/backup"`,
@@ -98,29 +101,71 @@ func renderJobImports(metadata RepoMetadata) string {
 }
 
 func renderModuleImports(metadata RepoMetadata) string {
-	moduleImports := make([]string, 0, len(metadata.Modules))
+	type moduleImport struct {
+		path string
+		line string
+	}
+
+	moduleImports := make([]moduleImport, 0, len(metadata.Modules)+1)
+	moduleImports = append(moduleImports, moduleImport{
+		path: "kumacore/app/modules/errorscreen",
+		line: `	"kumacore/app/modules/errorscreen"`,
+	})
+
 	for _, moduleSelection := range metadata.Modules {
 		switch moduleSelection.ID {
 		case "home":
-			moduleImports = append(moduleImports, `	"kumacore/app/modules/home"`)
+			moduleImports = append(moduleImports, moduleImport{
+				path: "kumacore/app/modules/home",
+				line: `	"kumacore/app/modules/home"`,
+			})
 		case "auth":
 			moduleImports = append(moduleImports,
-				`	authmiddleware "kumacore/app/middleware/auth"`,
-				`	authmodule "kumacore/app/modules/auth"`,
-				`	authrepository "kumacore/app/repositories/auth"`,
-				`	authservice "kumacore/app/services/auth"`,
-				`	"kumacore/core/cache"`,
+				moduleImport{
+					path: "kumacore/app/middleware/auth",
+					line: `	authmiddleware "kumacore/app/middleware/auth"`,
+				},
+				moduleImport{
+					path: "kumacore/app/modules/auth",
+					line: `	authmodule "kumacore/app/modules/auth"`,
+				},
+				moduleImport{
+					path: "kumacore/app/repositories/auth",
+					line: `	authrepository "kumacore/app/repositories/auth"`,
+				},
+				moduleImport{
+					path: "kumacore/app/services/auth",
+					line: `	authservice "kumacore/app/services/auth"`,
+				},
+				moduleImport{
+					path: "kumacore/core/cache",
+					line: `	"kumacore/core/cache"`,
+				},
 			)
 		case "health":
-			moduleImports = append(moduleImports, `	healthmodule "kumacore/app/modules/health"`)
+			moduleImports = append(moduleImports, moduleImport{
+				path: "kumacore/app/modules/health",
+				line: `	healthmodule "kumacore/app/modules/health"`,
+			})
 		}
 	}
 
-	return joinSectionLines(moduleImports)
+	sort.Slice(moduleImports, func(leftIndex int, rightIndex int) bool {
+		return moduleImports[leftIndex].path < moduleImports[rightIndex].path
+	})
+
+	importLines := make([]string, 0, len(moduleImports))
+	for _, moduleImport := range moduleImports {
+		importLines = append(importLines, moduleImport.line)
+	}
+
+	return joinSectionLines(importLines)
 }
 
 func renderModuleSetup(metadata RepoMetadata) string {
-	setupLines := make([]string, 0, len(metadata.Modules))
+	setupLines := make([]string, 0, len(metadata.Modules)+1)
+	setupLines = append(setupLines, `	notFoundHandler := errorscreen.NewHandler(renderer)`)
+
 	for _, moduleSelection := range metadata.Modules {
 		switch moduleSelection.ID {
 		case "home":
@@ -162,7 +207,7 @@ func renderModuleMiddleware(metadata RepoMetadata) string {
 }
 
 func renderModuleRoutes(metadata RepoMetadata) string {
-	routeLines := make([]string, 0, len(metadata.Modules))
+	routeLines := make([]string, 0, len(metadata.Modules)+1)
 	for _, moduleSelection := range metadata.Modules {
 		switch moduleSelection.ID {
 		case "home":
@@ -173,6 +218,8 @@ func renderModuleRoutes(metadata RepoMetadata) string {
 			routeLines = append(routeLines, `			healthmodule.Routes(healthHandler),`)
 		}
 	}
+
+	routeLines = append(routeLines, `			errorscreen.Routes(notFoundHandler),`)
 
 	return joinSectionLines(routeLines)
 }

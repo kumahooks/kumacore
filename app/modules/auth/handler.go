@@ -128,7 +128,7 @@ func (handler *Handler) Me(writer http.ResponseWriter, request *http.Request) {
 
 	if err := handler.renderer.Render(writer, request, pageFile, "page-content", data); err != nil {
 		log.Printf("[auth:Me] render: %v", err)
-		http.Error(writer, err.Error(), http.StatusInternalServerError)
+		http.Error(writer, "internal server error", http.StatusInternalServerError)
 	}
 }
 
@@ -142,6 +142,6 @@ func (handler *Handler) renderLogin(writer http.ResponseWriter, request *http.Re
 
 	if err := handler.renderer.Render(writer, request, pageFile, "page-content", data); err != nil {
 		log.Printf("[auth:renderLogin] render: %v", err)
-		http.Error(writer, err.Error(), http.StatusInternalServerError)
+		http.Error(writer, "internal server error", http.StatusInternalServerError)
 	}
 }

@@ -1,6 +1,8 @@
 package initcmd
 
 import (
+	"bytes"
+	"go/format"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -159,15 +161,15 @@ func TestRenderAppEmbed_OmitsModulesWithoutPageTemplates(t *testing.T) {
 	}
 
 	source := string(rendered)
-	for _, line := range strings.Split(source, "\n") {
-		if strings.HasPrefix(line, "//go:embed") && strings.Contains(line, "modules/") {
-			t.Fatalf("renderAppEmbed emitted a module pattern without page templates:\n%s", source)
-		}
+	if strings.Contains(source, "modules/health/") {
+		t.Fatalf("renderAppEmbed emitted a module pattern without page templates:\n%s", source)
 	}
 
 	for _, requiredPattern := range []string{
 		"web/templates/layouts/*.html",
 		"web/templates/components/*.html",
+		"modules/errorscreen/*.html",
+		"modules/*/components/*.html",
 	} {
 		if !strings.Contains(source, requiredPattern) {
 			t.Fatalf("renderAppEmbed missing pattern %q:\n%s", requiredPattern, source)
@@ -197,6 +199,87 @@ func TestPlannedChanges_IncludesAppEmbed(t *testing.T) {
 
 	if !strings.Contains(string(appEmbedChange.data), "modules/home/*.html") {
 		t.Fatalf("plannedChanges %s missing home module pattern:\n%s", appEmbedPath, appEmbedChange.data)
+	}
+}
+
+func TestPlannedChanges_AlwaysIncludesErrorScreen(t *testing.T) {
+	t.Chdir(repoRoot(t))
+
+	changes, err := plannedChanges(Options{ProjectName: "myapp", Modules: []string{"health"}})
+	if err != nil {
+		t.Fatalf("plannedChanges: %v", err)
+	}
+
+	plannedPaths := make(map[string]struct{}, len(changes))
+	for _, change := range changes {
+		plannedPaths[change.path] = struct{}{}
+	}
+
+	for _, requiredPath := range []string{
+		"app/modules/errorscreen/errorscreen.html",
+		"app/modules/errorscreen/components/error-body.html",
+		"app/modules/errorscreen/handler.go",
+	} {
+		if _, exists := plannedPaths[requiredPath]; !exists {
+			t.Fatalf("plannedChanges missing baseline error screen file %q", requiredPath)
+		}
+	}
+}
+
+func TestRewriteServerModules_AlwaysWiresErrorScreen(t *testing.T) {
+	t.Chdir(repoRoot(t))
+
+	source, err := os.ReadFile(serverModulesPath)
+	if err != nil {
+		t.Fatalf("ReadFile %s: %v", serverModulesPath, err)
+	}
+
+	rewritten, err := rewriteServerModules(
+		source,
+		metadataFromOptions(Options{Modules: []string{"health"}}),
+		"myapp",
+	)
+	if err != nil {
+		t.Fatalf("rewriteServerModules: %v", err)
+	}
+
+	for _, requiredSnippet := range []string{
+		`"myapp/app/modules/errorscreen"`,
+		`notFoundHandler := errorscreen.NewHandler(renderer)`,
+		`errorscreen.Routes(notFoundHandler),`,
+	} {
+		if !strings.Contains(string(rewritten), requiredSnippet) {
+			t.Fatalf("rewriteServerModules missing snippet %q:\n%s", requiredSnippet, rewritten)
+		}
+	}
+}
+
+func TestRewriteServerModules_ImportsAreGofmtFormatted(t *testing.T) {
+	t.Chdir(repoRoot(t))
+
+	source, err := os.ReadFile(serverModulesPath)
+	if err != nil {
+		t.Fatalf("ReadFile %s: %v", serverModulesPath, err)
+	}
+
+	for _, modules := range [][]string{
+		{"auth"},
+		{"auth", "health"},
+		{"home", "auth", "health"},
+	} {
+		rewritten, err := rewriteServerModules(source, metadataFromOptions(Options{Modules: modules}), "myapp")
+		if err != nil {
+			t.Fatalf("rewriteServerModules(%v): %v", modules, err)
+		}
+
+		formatted, err := format.Source(rewritten)
+		if err != nil {
+			t.Fatalf("rewriteServerModules(%v) produced invalid Go: %v", modules, err)
+		}
+
+		if !bytes.Equal(formatted, rewritten) {
+			t.Fatalf("rewriteServerModules(%v) is not gofmt-formatted:\n%s", modules, rewritten)
+		}
 	}
 }
 

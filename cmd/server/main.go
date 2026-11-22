@@ -30,7 +30,7 @@ func main() {
 		fileSystem = kumacoreapp.Templates
 	}
 
-	renderer, err := render.NewManager(configuration.Core.App.Dev, fileSystem)
+	renderer, err := render.NewManager(configuration.Core.App.Dev, fileSystem, app.DefaultErrorTemplatePath)
 	if err != nil {
 		log.Fatalf("[server:main] initialize renderer: %v", err)
 	}

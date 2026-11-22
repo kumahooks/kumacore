@@ -28,6 +28,8 @@ const (
 	defaultStaticDirectory = "app/web/static"
 	// defaultMigrationDirectory is relative to the template filesystem root.
 	defaultMigrationDirectory = "migrations/sqlite/app"
+	// DefaultErrorTemplatePath is the page template used by RenderError, relative to the template filesystem root.
+	DefaultErrorTemplatePath = "modules/errorscreen/errorscreen.html"
 )
 
 type WorkerRuntime interface {
@@ -42,14 +44,15 @@ type Options struct {
 	Database      *sql.DB
 	Dialect       dialect.Dialect
 	// Caller must not mutate these slices after passing to New.
-	Middleware      []func(http.Handler) http.Handler
-	Routes          []httpx.RouteRegistrar
-	Jobs            []worker.Job
-	FileSystem      fs.FS
-	StaticDir       string
-	MigrationSource migrate.Source
-	Renderer        render.Renderer
-	WorkerRuntime   WorkerRuntime
+	Middleware        []func(http.Handler) http.Handler
+	Routes            []httpx.RouteRegistrar
+	Jobs              []worker.Job
+	FileSystem        fs.FS
+	StaticDir         string
+	ErrorTemplatePath string
+	MigrationSource   migrate.Source
+	Renderer          render.Renderer
+	WorkerRuntime     WorkerRuntime
 }
 
 type App struct {
@@ -89,8 +92,14 @@ func New(options Options) (*App, error) {
 		staticDir = filepath.Join(options.Configuration.App.RootDir, defaultStaticDirectory)
 	}
 
+	errorTemplatePath := options.ErrorTemplatePath
+	if errorTemplatePath == "" {
+		errorTemplatePath = DefaultErrorTemplatePath
+	}
+
 	options.FileSystem = fileSystem
 	options.StaticDir = staticDir
+	options.ErrorTemplatePath = errorTemplatePath
 
 	return &App{
 		options: options,

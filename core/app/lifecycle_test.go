@@ -318,6 +318,16 @@ func TestInitialize_DefaultFileSystemRootsAtAppDirectory(t *testing.T) {
 	)
 	writeTestFile(
 		t,
+		filepath.Join(appDirectory, "modules/errorscreen/errorscreen.html"),
+		`{{define "page-content"}}{{template "error-body" .}}{{end}}`,
+	)
+	writeTestFile(
+		t,
+		filepath.Join(appDirectory, "modules/errorscreen/components/error-body.html"),
+		`{{define "error-body"}}{{end}}`,
+	)
+	writeTestFile(
+		t,
 		filepath.Join(appDirectory, "migrations/sqlite/app/0001_create_widgets.sql"),
 		`CREATE TABLE widgets (id INTEGER PRIMARY KEY);`,
 	)
@@ -390,6 +400,12 @@ func testFileSystem() fstest.MapFS {
 		},
 		"web/templates/components/navbar.html": &fstest.MapFile{
 			Data: []byte(`{{define "navbar"}}{{end}}`),
+		},
+		"modules/errorscreen/errorscreen.html": &fstest.MapFile{
+			Data: []byte(`{{define "page-content"}}{{template "error-body" .}}{{end}}`),
+		},
+		"modules/errorscreen/components/error-body.html": &fstest.MapFile{
+			Data: []byte(`{{define "error-body"}}{{end}}`),
 		},
 		"migrations/sqlite/app/0001_create_widgets.sql": &fstest.MapFile{
 			Data: []byte(`CREATE TABLE widgets (id INTEGER PRIMARY KEY);`),

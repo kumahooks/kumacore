@@ -33,7 +33,12 @@ What it does:
 - direct requests and history restores render the full base page
 - `HX-Request-Type: partial` renders the requested fragment
 - responses vary on `HX-Request-Type`
+- `RenderError` renders the configured error template as a full page with the requested status
+- partial HTMX errors respond with `HX-Redirect` and an empty body so the client re-enters as a direct load
+- production validates the error template at startup; dev re-reads it per request
 - template parsing preserves clone-based page isolation
+- module-local components under `modules/<name>/components/*.html` are parsed with their page
+- duplicate define names across module component files abort the build
 - template paths are rooted at `app/`
 
 ### `core/db` seams
@@ -77,7 +82,9 @@ Purpose:
 
 What it does:
 - selected HTTP-facing modules are copied into the generated app under `app/modules/`
-- `app/embed.go` is generated with embed patterns for the selected modules that contain page templates
+- `errorscreen` is baseline, always copied, and wired to the router's `NotFound` path
+- `app/embed.go` is generated with embed patterns for the selected modules that contain page templates, plus the
+  baseline error screen and module component fragments
 - copied implementation files are app-owned source after generation
 - generated bootstrap wiring is explicit
 - runtime behavior does not depend on module directory scanning or hidden autoloading

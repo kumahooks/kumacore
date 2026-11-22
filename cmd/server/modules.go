@@ -10,6 +10,7 @@ import (
 	// kumacore:begin modules-imports
 	authmiddleware "kumacore/app/middleware/auth"
 	authmodule "kumacore/app/modules/auth"
+	"kumacore/app/modules/errorscreen"
 	healthmodule "kumacore/app/modules/health"
 	"kumacore/app/modules/home"
 	authrepository "kumacore/app/repositories/auth"
@@ -50,6 +51,7 @@ func buildModules(
 
 	homeHandler := home.NewHandler(renderer, configuration.App.Name)
 	authHandler := authmodule.NewHandler(renderer, authService, configuration.Core.App.Dev)
+	notFoundHandler := errorscreen.NewHandler(renderer)
 
 	healthHandler := healthmodule.NewHandler(
 		appDatabase,
@@ -69,6 +71,7 @@ func buildModules(
 			home.Routes(homeHandler),
 			authmodule.Routes(authHandler),
 			healthmodule.Routes(healthHandler),
+			errorscreen.Routes(notFoundHandler),
 			// kumacore:end modules-routes
 		},
 	}, nil

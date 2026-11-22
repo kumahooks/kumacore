@@ -255,6 +255,7 @@ func plannedProjectFiles(options Options) ([]fileChange, error) {
 		"app/migrations/embed.go",
 		"app/migrations/source.go",
 		"app/migrations/sqlite/worker",
+		"app/modules/errorscreen",
 		"app/testing",
 		"app/web",
 	}
@@ -411,7 +412,7 @@ func rewriteServerWorker(source []byte, projectName string) ([]byte, error) {
 		{
 			beginMarker: "// kumacore:begin jobs-imports",
 			endMarker:   "// kumacore:end jobs-imports",
-			content:     renderJobImports(RepoMetadata{}),
+			content:     renderJobImports(),
 		},
 		{
 			beginMarker: "// kumacore:begin jobs-register",

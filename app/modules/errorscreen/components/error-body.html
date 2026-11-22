@@ -1,0 +1,26 @@
+{{/* error-body is the shared markup used by both render paths. Direct
+loads and history-restore requests render base -> page-content -> error-body.
+HTMX requests are redirected via HX-Redirect (see render.RenderError) so the
+handler re-enters as a direct load and renders base, avoiding nested
+landmarks from swapping a fragment into #content. */}}
+{{define "error-body"}}
+<div class="page-content page-content--error">
+	<div class="terminal-card">
+		<div class="line">
+			<span class="terminal-user">root</span><span class="terminal-host">@kumacore</span> <span class="terminal-path">~/{{.Status}}</span>
+		</div>
+
+		<div class="line">
+			<span class="terminal-arrow">&gt;</span> <span class="terminal-cmd">{{.Message}}</span>
+		</div>
+
+		<div class="line">
+			<span class="terminal-user">root</span><span class="terminal-host">@kumacore</span> <span class="terminal-path">~/{{.Status}}</span>
+		</div>
+
+		<div class="line">
+			<span class="terminal-arrow">&gt;</span> <a href="/" class="terminal-link" hx-boost="false">cd ..</a>
+		</div>
+	</div>
+</div>
+{{end}}

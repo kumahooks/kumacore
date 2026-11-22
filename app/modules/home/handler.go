@@ -39,6 +39,6 @@ func (handler *Handler) Index(writer http.ResponseWriter, request *http.Request)
 
 	if err := handler.renderer.Render(writer, request, pageFile, "page-content", data); err != nil {
 		log.Printf("[home:Index] render: %v", err)
-		http.Error(writer, err.Error(), http.StatusInternalServerError)
+		http.Error(writer, "internal server error", http.StatusInternalServerError)
 	}
 }
